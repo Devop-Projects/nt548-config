@@ -1,0 +1,38 @@
+# bootstrap/root-app.yaml
+#
+# Root Application — quản lý mọi ArgoCD Application khác.
+#
+# Đây là MANIFEST DUY NHẤT bạn `kubectl apply` thủ công.
+# Sau đó, mọi thay đổi đi qua Git → ArgoCD tự sync.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: root
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    # ⚠️ ĐỔI THÀNH URL CONFIG REPO CỦA BẠN
+    repoURL: https://github.com/Devop-Projects/nt548-config.git
+    targetRevision: main
+    path: platform/argocd/apps      # Folder chứa các Application CRD
+
+    directory:
+      recurse: true                  # Bao gồm subfolders (sau này có nhiều apps)
+      include: '*.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=false        # argocd namespace đã có
+      - ServerSideApply=true
