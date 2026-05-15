@@ -1,0 +1,10 @@
+# Kustomize build output (never commit)
+*.rendered.yaml
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
