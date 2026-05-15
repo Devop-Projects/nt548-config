@@ -1,0 +1,111 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  labels:
+    app.kubernetes.io/name: postgres
+    app.kubernetes.io/part-of: task-manager
+spec:
+  serviceName: postgres-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      terminationGracePeriodSeconds: 60
+
+      # ─── RBAC ───
+      serviceAccountName: postgres-sa
+      automountServiceAccountToken: false
+
+      # ─── Pod-level Security Context ───
+      # postgres:15-alpine có sẵn user "postgres" UID=70 (Alpine convention)
+      # Verify: docker run --rm postgres:15-alpine id postgres
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 70                # postgres user (Alpine version)
+        runAsGroup: 70
+        fsGroup: 70                  # QUAN TRỌNG: PVC sẽ thuộc group này
+                                     # → postgres user có quyền ghi data
+
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - name: postgres
+          containerPort: 5432
+
+        # ─── Container-level Security Context ───
+        # LƯU Ý: KHÔNG dùng readOnlyRootFilesystem cho database!
+        # Postgres BẮT BUỘC ghi vào nhiều paths:
+        #   - /var/lib/postgresql/data (data files - đã có PVC)
+        #   - /var/run/postgresql (lock files)
+        #   - /tmp (temp sort files)
+        # Thay vì cấm hoàn toàn, ta chỉ drop capabilities + seccomp
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false      # Database cần ghi - không khả thi
+          capabilities:
+            drop: ["ALL"]                    # Drop tất cả - postgres không cần
+          seccompProfile:
+            type: RuntimeDefault
+
+        env:
+        - name: POSTGRES_DB
+          value: taskdb
+        - name: POSTGRES_USER
+          value: taskuser
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_PASSWORD
+        - name: PGDATA
+          value: /var/lib/postgresql/data/pgdata
+
+        volumeMounts:
+        - name: data
+          mountPath: /var/lib/postgresql/data
+
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi
+
+        # ─── PROBES ───
+        startupProbe:
+          exec:
+            command: ["pg_isready", "-U", "taskuser", "-d", "taskdb"]
+          periodSeconds: 10
+          failureThreshold: 30        # 30 × 10s = 5 phút (initdb chậm)
+
+        livenessProbe:
+          exec:
+            command: ["pg_isready", "-U", "taskuser"]
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+
+        readinessProbe:
+          exec:
+            command: ["pg_isready", "-U", "taskuser", "-d", "taskdb"]
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: [ReadWriteOnce]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 5Gi

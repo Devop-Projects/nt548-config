@@ -1,0 +1,82 @@
+# apps/task-manager/overlays/dev/kustomization.yaml
+#
+# Dev environment overlay — deploy vào AWS EKS dev cluster.
+#
+# Inherits từ base + patches:
+# - Image: local registry → Docker Hub
+# - Secrets: postgres-secrets local → External Secrets (AWS)
+# - Ingress: NGINX → ALB
+# - DB: StatefulSet local → scale-to-0 (dùng RDS)
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: task-manager-dev
+
+# ─── Base + dev-specific resources ───
+resources:
+- ../../base
+- secret-store.yaml              # ClusterSecretStore
+- external-secret.yaml           # DB credentials (rds!db-xxx)
+- external-secret-backend.yaml   # JWT secret (devops/dev/backend/secrets)
+- ingress-alb.yaml               # ALB Ingress (thay nginx)
+
+# ─── Image tag override ───
+# IMAGE_TAG sẽ được CI cập nhật tự động (cross-repo update)
+images:
+- name: task-manager-backend
+  newName: doanvantai/nt548-backend
+  newTag: 8ca1feb
+- name: task-manager-frontend
+  newName: doanvantai/nt548-frontend
+  newTag: 8ca1feb
+
+# ─── ConfigMap merge: thêm DB connection info ───
+configMapGenerator:
+- name: backend-config
+  behavior: merge                # Merge với ConfigMap base
+  literals:
+  - DB_HOST=devops-dev-db.chi0awig8v33.ap-southeast-1.rds.amazonaws.com
+  - DB_PORT=5432
+  - DB_NAME=appdb
+  - DB_USER=appuser
+  - DB_SSL=true
+
+# ─── Patches ───
+patches:
+# Xóa nginx Ingress (dùng ALB thay)
+- path: delete-nginx-ingress.yaml
+
+# Override backend deployment (image, secrets source)
+- path: backend-deployment-patch.yaml
+  target:
+    kind: Deployment
+    name: backend
+
+# Override frontend deployment (image)
+- path: frontend-deployment-patch.yaml
+  target:
+    kind: Deployment
+    name: frontend
+
+# Override migrate Job (image, secrets source)
+- path: migrate-job-patch.yaml
+  target:
+    kind: Job
+    name: db-migrate
+
+# Scale Postgres về 0 (dùng RDS thay)
+- target:
+    kind: StatefulSet
+    name: postgres
+  patch: |-
+    - op: replace
+      path: /spec/replicas
+      value: 0
+
+# ─── Environment labels ───
+labels:
+- pairs:
+    environment: dev
+    cloud: aws
+  includeSelectors: false

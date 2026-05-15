@@ -1,0 +1,132 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: task-manager-dev
+  labels:
+    app.kubernetes.io/name: backend
+    app.kubernetes.io/part-of: task-manager
+    app.kubernetes.io/component: api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  revisionHistoryLimit: 5
+  template:
+    metadata:
+      labels:
+        app: backend
+        version: v0.1.3
+    spec:
+      terminationGracePeriodSeconds: 30
+
+      # ─── RBAC ───
+      serviceAccountName: backend-sa
+      automountServiceAccountToken: false   # Double safety - explicit ở pod level
+
+      # ─── Pod-level Security Context ───
+      # Áp dụng cho TẤT CẢ container trong pod
+      securityContext:
+        runAsNonRoot: true        # Bắt buộc non-root
+        runAsUser: 1000           # UID app user (xem Dockerfile)
+        runAsGroup: 1000          # GID
+        fsGroup: 1000             # Group sở hữu volume
+
+      containers:
+      - name: backend
+        image: task-manager-backend:v0.1.3
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 3000
+
+        # ─── Container-level Security Context ───
+        securityContext:
+          allowPrivilegeEscalation: false   # Block setuid escalation
+          readOnlyRootFilesystem: true      # Filesystem read-only
+          capabilities:
+            drop: ["ALL"]                   # Bỏ tất cả Linux capabilities
+          seccompProfile:
+            type: RuntimeDefault            # Filter syscall
+
+        # ─── Volume mount cho ghi tạm (vì read-only fs) ───
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp                   # Node app có thể cần /tmp
+
+        # ─── ConfigMap: non-sensitive config ───
+        envFrom:
+        - configMapRef:
+            name: backend-config
+
+        # ─── Secrets: sensitive values ───
+        # Pattern: Single Source of Truth
+        # POSTGRES_PASSWORD comes from postgres-secrets (same as Postgres pod)
+        # JWT_SECRET comes from backend-secrets (app-specific)
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: JWT_SECRET
+
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+
+        # ─── PROBES ───
+        # Startup: cho app 60s để start (Node.js + Sequelize init)
+        startupProbe:
+          httpGet:
+            path: /health/live
+            port: http
+          periodSeconds: 5
+          failureThreshold: 12        # 12 × 5s = 60s
+        
+        # Liveness: app process alive
+        # KHÔNG check DB! (anti-pattern)
+        livenessProbe:
+          httpGet:
+            path: /health/live
+            port: http
+          periodSeconds: 30
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # Readiness: app + DB ready
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: http
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        
+        # ─── LIFECYCLE: preStop để Endpoints sync ───
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep 5"]
+        
+      # ─── Volumes (cho read-only fs) ───
+      volumes:
+      - name: tmp
+        emptyDir: {}            # Ephemeral storage trong RAM
+
+        
+

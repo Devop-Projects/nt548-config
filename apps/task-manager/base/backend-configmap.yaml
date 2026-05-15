@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: task-manager-dev
+data:
+  # ─── App config ───
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  PORT: "3000"
+  JWT_EXPIRES_IN: "7d"
+
+  # ─── DB pool tuning ───
+  DB_POOL_MAX: "10"
+  DB_POOL_MIN: "2"
+
+  # ─── DB connection metadata (NON-SENSITIVE) ───
+  # Password is injected separately from postgres-secrets
+  DB_HOST: "postgres"
+  DB_PORT: "5432"
+  DB_NAME: "taskdb"
+  DB_USER: "taskuser"

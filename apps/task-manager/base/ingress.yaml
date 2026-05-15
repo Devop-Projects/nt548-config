@@ -1,0 +1,53 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: task-manager
+  namespace: task-manager-dev
+  annotations:
+    # ─── cert-manager tự động cấp cert ───
+    # Đây là "magic" annotation - cert-manager thấy → tự tạo Certificate
+    # → request từ ClusterIssuer "selfsigned-issuer"
+    # → lưu cert vào Secret "task-manager-tls"
+    cert-manager.io/cluster-issuer: selfsigned-issuer
+
+    # ─── Force redirect HTTP → HTTPS ───
+    # Khi user gõ http://... → tự động chuyển sang https://...
+    # Vì đây là local + self-signed, ban đầu để FALSE để tránh redirect loop
+    # Sau khi cert OK, đổi sang TRUE
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+
+spec:
+  ingressClassName: nginx
+
+  # ─── TLS Configuration ───
+  # Khi có section này, Ingress sẽ:
+  # 1. Listen trên port 443 (HTTPS)
+  # 2. Đọc cert từ Secret "task-manager-tls"
+  # 3. Terminate TLS tại đây - traffic vào backend là HTTP plain
+  tls:
+  - hosts:
+    - taskmanager.local
+    secretName: task-manager-tls    # cert-manager sẽ TỰ TẠO Secret này
+
+  rules:
+  - host: taskmanager.local
+    http:
+      paths:
+      # API routes → backend
+      - path: /api
+        pathType: Prefix
+        backend:
+          service:
+            name: backend
+            port:
+              number: 3000
+
+      # All others → frontend (catch-all)
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: frontend
+            port:
+              number: 80

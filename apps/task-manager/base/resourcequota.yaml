@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: task-manager-quota
+  namespace: task-manager-dev
+spec:
+  hard:
+    # Compute — đủ cho 3-tier app + buffer
+    requests.cpu: "4"
+    requests.memory: "4Gi"
+    limits.cpu: "8"
+    limits.memory: "8Gi"
+    
+    # Storage
+    requests.storage: "20Gi"
+    persistentvolumeclaims: "5"
+    
+    # Object count
+    pods: "20"
+    services: "10"
+    configmaps: "10"
+    secrets: "10"

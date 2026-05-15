@@ -1,0 +1,42 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: task-manager-prod
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  
+  minReplicas: 2
+  maxReplicas: 10
+  
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70    # CPU > 70% trung bình → scale up
+  
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  
+  behavior:                         # Tránh scale "yo-yo"
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100                # Tối đa double replicas mỗi 60s
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300  # Đợi 5 phút trước khi scale down
+      policies:
+      - type: Percent
+        value: 50                  # Tối đa giảm 50% mỗi 60s
+        periodSeconds: 60

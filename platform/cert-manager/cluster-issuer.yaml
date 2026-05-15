@@ -1,0 +1,15 @@
+# ─── ClusterIssuer: Self-Signed (cho local development) ───
+#
+# Đây là "nhà cung cấp cert" - khai báo cách cert-manager xin cert.
+#
+# selfSigned: cert-manager tự generate cert (không cần CA bên ngoài)
+# Phù hợp: local dev (kind, minikube), demo, thesis
+# Hạn chế: Browser sẽ báo "Not Secure" vì không có CA tin cậy ký
+#
+# Production: thay bằng ACME (Let's Encrypt) - cần domain thật
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: selfsigned-issuer
+spec:
+  selfSigned: {}

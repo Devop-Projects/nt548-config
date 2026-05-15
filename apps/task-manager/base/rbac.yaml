@@ -1,0 +1,34 @@
+# ============================================================================
+# RBAC - Triết lý "Least Privilege"
+# ============================================================================
+# App task-manager KHÔNG cần gọi K8s API → Không cấp quyền + Không mount token
+# Đây là best practice 2024 cho mọi pod không cần K8s API
+# ============================================================================
+
+# ─── ServiceAccount cho Backend ───
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: backend-sa
+  namespace: task-manager-dev
+# QUAN TRỌNG: Tắt auto-mount token K8s
+# Lý do: Backend không gọi K8s API → token là attack surface không cần thiết
+automountServiceAccountToken: false
+
+---
+# ─── ServiceAccount cho Frontend ───
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: frontend-sa
+  namespace: task-manager-dev
+automountServiceAccountToken: false
+
+---
+# ─── ServiceAccount cho Postgres ───
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: postgres-sa
+  namespace: task-manager-dev
+automountServiceAccountToken: false

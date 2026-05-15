@@ -1,0 +1,35 @@
+# ─── Headless Service (cho StatefulSet DNS resolution) ───
+# Đặc điểm: clusterIP: None → DNS resolve thẳng đến Pod IP
+# Dùng cho: postgres-0.postgres-headless.task-manager-dev.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-headless
+  labels:
+    app: postgres
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432
+
+---
+# ─── ClusterIP Service (cho app dễ connect bằng "postgres") ───
+# Backend app dùng DB_HOST=postgres → resolve qua Service này
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+  - name: postgres
+    port: 5432
+    targetPort: 5432

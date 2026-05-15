@@ -1,0 +1,16 @@
+# apps/task-manager/overlays/staging/kustomization.yaml
+#
+# ⚠️ PLACEHOLDER — chưa deploy. Sẽ implement ở   (Helm) hoặc khi cần staging env.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: task-manager-staging
+
+resources:
+- ../../base
+
+labels:
+- pairs:
+    environment: staging
+  includeSelectors: false

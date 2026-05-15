@@ -1,0 +1,15 @@
+# k8s/overlays/aws/frontend-deployment-patch.yaml
+# Strategic Merge: chỉ override image.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: task-manager-dev
+spec:
+  template:
+    spec:
+      containers:
+      - name: frontend
+        image: doanvantai/nt548-frontend:e4194db
+        imagePullPolicy: IfNotPresent

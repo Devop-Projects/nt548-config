@@ -1,0 +1,27 @@
+# k8s/base/namespace.yaml
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: task-manager-dev
+  labels:
+    environment: dev
+    project: task-manager
+    managed-by: thesis
+
+    # ─── PodSecurity Admission (K8s 1.25+) ───
+    # 3 levels: privileged / baseline / restricted
+    #
+    # Workflow đề xuất:
+    # 1. Bắt đầu: audit + warn (chỉ log, không block)
+    # 2. Fix tất cả warnings
+    # 3. Đổi sang enforce: restricted
+    #
+    # Hiện tại: audit mode để quan sát
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/audit-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest
+
+    # Khi sẵn sàng strict, uncomment dòng dưới:
+    # pod-security.kubernetes.io/enforce: restricted
+    # pod-security.kubernetes.io/enforce-version: latest

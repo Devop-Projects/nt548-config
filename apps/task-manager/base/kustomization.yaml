@@ -1,0 +1,53 @@
+# apps/task-manager/base/kustomization.yaml
+#
+# Base manifests — DRY, environment-agnostic.
+# Mỗi overlay (dev/staging/prod) sẽ kế thừa và patch riêng.
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Common labels cho mọi resource — KHÔNG inject vào selector
+# (selectors là immutable, không thể thay đổi sau khi tạo)
+labels:
+- pairs:
+    app.kubernetes.io/part-of: task-manager
+    app.kubernetes.io/managed-by: kustomize
+  includeSelectors: false
+
+# Common annotations
+commonAnnotations:
+  thesis.author: "vantai-NT548"
+
+# ─── Resources ───
+resources:
+# Governance
+- namespace.yaml
+- resourcequota.yaml
+- limitrange.yaml
+- rbac.yaml
+
+# Database layer
+- postgres-statefulset.yaml
+- postgres-services.yaml
+
+# Backend layer
+- backend-configmap.yaml
+- backend-deployment.yaml
+- backend-service.yaml
+- migrate-job.yaml
+
+# Frontend layer
+- frontend-deployment.yaml
+- frontend-service.yaml
+
+# Networking
+- ingress.yaml
+- network-policies.yaml
+
+# ─── Image transformer ───
+# Overlay sẽ override newName + newTag
+images:
+- name: task-manager-backend
+  newTag: v0.1.3
+- name: task-manager-frontend
+  newTag: v0.1.0

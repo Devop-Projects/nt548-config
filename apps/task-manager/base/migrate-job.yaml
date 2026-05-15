@@ -1,0 +1,67 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app: db-migrate
+    spec:
+      restartPolicy: OnFailure
+
+      # ─── RBAC ───
+      serviceAccountName: backend-sa     # Reuse backend SA
+      automountServiceAccountToken: false
+
+      # ─── Pod-level Security Context ───
+      # Migration Job dùng cùng image với backend → cùng UID 1000 (node)
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+
+      containers:
+      - name: migrate
+        image: task-manager-backend:v0.2.0-secure   # Version mới (non-root)
+        imagePullPolicy: IfNotPresent
+        command: ["node", "src/scripts/migrate.js"]
+
+        # ─── Container-level Security Context ───
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
+
+        # ─── Volume mount cho /tmp (vì read-only fs) ───
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+        # ─── Config từ ConfigMap ───
+        envFrom:
+        - configMapRef:
+            name: backend-config
+
+        # ─── Secrets ───
+        env:
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: postgres-secrets
+              key: POSTGRES_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: JWT_SECRET
+
+      volumes:
+      - name: tmp
+        emptyDir: {}

@@ -1,0 +1,45 @@
+# k8s/overlays/aws/backend-deployment-patch.yaml
+#
+# Strategic Merge Patch cho backend Deployment trên AWS.
+#
+# Override 3 thứ:
+# 1. image: local → Docker Hub
+# 2. POSTGRES_PASSWORD: postgres-secrets → db-credentials (ESO sync từ rds!db-xxx)
+# 3. JWT_SECRET: backend-secrets (ESO sync từ devops/dev/backend/secrets)
+#    ⚠️ Trên base, secret name "backend-secrets" cũng đã được dùng,
+#    nên container env reference KHÔNG đổi — chỉ NGUỒN gốc của Secret đổi
+#    (từ manual openssl → ESO managed).
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: task-manager-dev
+spec:
+  template:
+    spec:
+      containers:
+      - name: backend
+        image: doanvantai/nt548-backend:e4194db
+        imagePullPolicy: IfNotPresent
+        env:
+        # ─── DB credentials (từ ESO synced "db-credentials") ───
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: DB_PASSWORD
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: DB_USERNAME
+
+        # ─── JWT secret (từ ESO synced "backend-secrets") ───
+        # Base manifest đã có declaration, nhưng để rõ ràng,
+        # ta override để đảm bảo source là ESO (không phải openssl random)
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: JWT_SECRET
