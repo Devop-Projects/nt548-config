@@ -2,7 +2,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: backend-config
-  namespace: task-manager-dev
+  # namespace: task-manager-dev
 data:
   # ─── App config ───
   NODE_ENV: "production"
