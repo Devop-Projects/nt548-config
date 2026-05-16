@@ -2,25 +2,24 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  # Tên Job include Release.Revision để Job mới được tạo mỗi lần upgrade
-  name: {{ include "task-manager.fullname" . }}-db-migrate-{{ .Release.Revision }}
+  # ⭐ FIX 1: Name dựa trên image SHA hash
+  # → Mỗi image change = unique name → không conflict
+  name: {{ include "task-manager.fullname" . }}-db-migrate-{{ include "task-manager.backend.image" . | sha256sum | trunc 8 }}
   namespace: {{ .Values.namespace.name }}
   labels:
     {{- include "task-manager.labels" . | nindent 4 }}
     app: db-migrate
     app.kubernetes.io/component: migration
   annotations:
-    # ⭐ Helm hook: chạy TRƯỚC install/upgrade
-    # Nếu Job fail → install/upgrade fail → app cũ giữ nguyên (atomic)
-    "helm.sh/hook": {{ .Values.migration.hookType }}
-    "helm.sh/hook-weight": {{ .Values.migration.hookWeight | quote }}
-    # Cleanup policy:
-    # - before-hook-creation: xóa Job cũ trước khi tạo mới
-    # - hook-succeeded: xóa Job khi succeed (giữ logs nếu fail để debug)
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+    # ⭐ FIX 2: hook-failed → auto cleanup khi Job fail
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
 spec:
   backoffLimit: {{ .Values.migration.backoffLimit }}
   ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
+  # ⭐ FIX 3: Tự fail sau 5 phút → chống stuck mãi
+  activeDeadlineSeconds: 300
 
   template:
     metadata:
