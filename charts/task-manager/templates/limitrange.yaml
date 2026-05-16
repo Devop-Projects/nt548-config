@@ -1,0 +1,20 @@
+{{- if .Values.limitRange.enabled -}}
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ include "task-manager.fullname" . }}-limits
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+spec:
+  limits:
+  - type: Container
+    default:
+      {{- toYaml .Values.limitRange.default | nindent 6 }}
+    defaultRequest:
+      {{- toYaml .Values.limitRange.defaultRequest | nindent 6 }}
+    min:
+      {{- toYaml .Values.limitRange.min | nindent 6 }}
+    max:
+      {{- toYaml .Values.limitRange.max | nindent 6 }}
+{{- end }}

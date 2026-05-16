@@ -1,0 +1,31 @@
+{{- if .Values.podDisruptionBudget.enabled -}}
+{{- if .Values.backend.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "task-manager.backend.fullname" . }}-pdb
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.backend.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "task-manager.backend.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- if .Values.frontend.enabled }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "task-manager.frontend.fullname" . }}-pdb
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.frontend.labels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.podDisruptionBudget.frontend.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "task-manager.frontend.selectorLabels" . | nindent 6 }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,51 @@
+═══════════════════════════════════════════════════════════════
+  task-manager {{ .Chart.Version }} (app v{{ .Chart.AppVersion }})
+  Release "{{ .Release.Name }}" deployed to "{{ .Release.Namespace }}"
+═══════════════════════════════════════════════════════════════
+
+Environment: {{ .Values.global.environment }}
+Cloud: {{ .Values.global.cloud }}
+
+─── Components deployed ───
+{{- if .Values.backend.enabled }}
+  ✓ Backend:  {{ .Values.backend.replicaCount }} replicas, image {{ include "task-manager.backend.image" . }}
+{{- end }}
+{{- if .Values.frontend.enabled }}
+  ✓ Frontend: {{ .Values.frontend.replicaCount }} replicas, image {{ include "task-manager.frontend.image" . }}
+{{- end }}
+{{- if .Values.postgres.enabled }}
+  ✓ Postgres (in-cluster, StatefulSet)
+{{- else }}
+  ⓘ Postgres disabled (using external RDS)
+{{- end }}
+{{- if .Values.backend.externalSecret.enabled }}
+  ✓ External Secrets (AWS Secrets Manager)
+{{- end }}
+{{- if .Values.autoscaling.enabled }}
+  ✓ HPA: {{ .Values.autoscaling.backend.minReplicas }}-{{ .Values.autoscaling.backend.maxReplicas }} replicas
+{{- end }}
+
+─── Verify deployment ───
+  kubectl get pods,svc,ingress -n {{ .Values.namespace.name }}
+  kubectl logs -n {{ .Values.namespace.name }} -l app=backend --tail=50
+
+─── Access application ───
+{{- range .Values.ingress.hosts }}
+  {{- if $.Values.ingress.tls.enabled }}
+  https://{{ .host }}
+  {{- else }}
+  http://{{ .host }}
+  {{- end }}
+{{- end }}
+
+{{- if .Values.backend.externalSecret.enabled }}
+
+─── Secret sync status ───
+  kubectl get externalsecret -n {{ .Values.namespace.name }}
+{{- end }}
+
+Health check:
+  kubectl exec -n {{ .Values.namespace.name }} deploy/{{ include "task-manager.backend.fullname" . }} -- \
+    wget -qO- http://localhost:3000/health/ready
+
+═══════════════════════════════════════════════════════════════

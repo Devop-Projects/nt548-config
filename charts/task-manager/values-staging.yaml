@@ -1,0 +1,56 @@
+# values-staging.yaml — Staging environment
+# Đặc điểm: giống prod nhưng smaller scale
+
+global:
+  environment: staging
+  cloud: aws
+
+namespace:
+  create: true
+  name: task-manager-staging
+
+backend:
+  replicaCount: 2
+  image:
+    tag: "8ca1feb"   # Same image as dev (build once, deploy many)
+  config:
+    LOG_LEVEL: info
+    DB_HOST: ""     # TODO: staging RDS endpoint
+    DB_NAME: "appdb"
+    DB_USER: "appuser"
+    DB_SSL: "true"
+  externalSecret:
+    enabled: true
+    awsSecretName: "devops/staging/backend/secrets"
+    dbSecretName: ""   # TODO: staging RDS secret
+
+frontend:
+  replicaCount: 2
+  image:
+    tag: "8ca1feb"
+
+postgres:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: alb
+  alb:
+    certificateArn: ""   # TODO
+    healthcheckPath: /health/ready
+  hosts:
+    - host: staging.task-manager.vantai.click
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: backend
+          servicePort: 3000
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+          servicePort: 80
+
+autoscaling:
+  enabled: false
+podDisruptionBudget:
+  enabled: false

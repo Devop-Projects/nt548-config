@@ -1,0 +1,42 @@
+{{- if and .Values.autoscaling.enabled .Values.backend.enabled -}}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "task-manager.backend.fullname" . }}-hpa
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "task-manager.backend.fullname" . }}
+  minReplicas: {{ .Values.autoscaling.backend.minReplicas }}
+  maxReplicas: {{ .Values.autoscaling.backend.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.backend.targetCPUUtilization }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.autoscaling.backend.targetMemoryUtilization }}
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 50
+        periodSeconds: 60
+{{- end }}

@@ -1,0 +1,85 @@
+# values-prod.yaml — Production environment
+#
+# Differs from staging:
+# - 5 replicas backend, 3 replicas frontend
+# - HPA enabled
+# - PDB enabled
+# - LOG_LEVEL=warn (less noise)
+# - Pinned semver tag (not SHA)
+
+global:
+  environment: prod
+  cloud: aws
+
+namespace:
+  create: true
+  name: task-manager-prod
+
+backend:
+  replicaCount: 5
+  image:
+    tag: "v1.0.0"   # ⚠️ Pinned semver, không phải SHA
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 512Mi
+  config:
+    LOG_LEVEL: warn
+    DB_HOST: ""     # TODO: prod RDS endpoint
+    DB_NAME: "appdb"
+    DB_USER: "appuser"
+    DB_SSL: "true"
+    DB_POOL_MAX: "20"   # Tăng pool size cho prod
+    DB_POOL_MIN: "5"
+  externalSecret:
+    enabled: true
+    awsSecretName: "devops/prod/backend/secrets"
+    dbSecretName: ""   # TODO
+
+frontend:
+  replicaCount: 3
+  image:
+    tag: "v1.0.0"
+
+postgres:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: alb
+  alb:
+    certificateArn: ""   # TODO
+    healthcheckPath: /health/ready
+  hosts:
+    - host: task-manager.vantai.click
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: backend
+          servicePort: 3000
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+          servicePort: 80
+
+# ⭐ Prod-only features
+autoscaling:
+  enabled: true
+  backend:
+    minReplicas: 3
+    maxReplicas: 15
+    targetCPUUtilization: 70
+    targetMemoryUtilization: 80
+
+podDisruptionBudget:
+  enabled: true
+  backend:
+    minAvailable: 2
+  frontend:
+    minAvailable: 1
+
+networkPolicies:
+  enabled: true

@@ -1,0 +1,60 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "task-manager.fullname" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+  annotations:
+    {{- if eq .Values.ingress.className "alb" }}
+    # AWS ALB annotations (auto-injected khi className=alb)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    {{- with .Values.ingress.alb.certificateArn }}
+    alb.ingress.kubernetes.io/certificate-arn: {{ . }}
+    alb.ingress.kubernetes.io/ssl-policy: ELBSecurityPolicy-TLS13-1-2-2021-06
+    alb.ingress.kubernetes.io/ssl-redirect: '443'
+    {{- end }}
+    alb.ingress.kubernetes.io/healthcheck-path: {{ .Values.ingress.alb.healthcheckPath }}
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: '15'
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: '5'
+    alb.ingress.kubernetes.io/healthy-threshold-count: '2'
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: '3'
+    alb.ingress.kubernetes.io/success-codes: '200'
+    alb.ingress.kubernetes.io/tags: Project=devops,Environment={{ .Values.global.environment }},ManagedBy=helm
+    {{- end }}
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+  - hosts:
+    {{- range .Values.ingress.hosts }}
+    - {{ .host | quote }}
+    {{- end }}
+    {{- with .Values.ingress.tls.secretName }}
+    secretName: {{ . }}
+    {{- end }}
+  {{- end }}
+
+  rules:
+  {{- range .Values.ingress.hosts }}
+  - host: {{ .host | quote }}
+    http:
+      paths:
+      {{- range .paths }}
+      - path: {{ .path }}
+        pathType: {{ .pathType }}
+        backend:
+          service:
+            name: {{ .serviceName }}
+            port:
+              number: {{ .servicePort }}
+      {{- end }}
+  {{- end }}
+{{- end }}

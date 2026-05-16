@@ -1,0 +1,13 @@
+{{- if .Values.backend.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "task-manager.backend.fullname" . }}-config
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.backend.config }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+{{- end }}

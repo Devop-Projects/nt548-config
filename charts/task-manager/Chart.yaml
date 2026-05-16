@@ -1,0 +1,48 @@
+# charts/task-manager/Chart.yaml
+#
+# Metadata cho chart task-manager.
+
+apiVersion: v2
+name: task-manager
+description: |
+  Helm chart for NT548 task-manager application.
+  Includes backend (Node.js + Express), frontend (React + Nginx),
+  and supporting infrastructure (External Secrets, Ingress, RBAC).
+
+# 'application' = deploy được. 'library' = chỉ chứa helpers.
+type: application
+
+# Chart version — bump khi sửa templates/structure
+# SemVer: MAJOR.MINOR.PATCH
+version: 0.1.0
+
+# App version — bump khi binary app đổi
+# CI sẽ update field này tự động
+appVersion: "0.1.3"
+
+# Metadata cho thesis & open-source presentation
+keywords:
+  - task-manager
+  - gitops
+  - thesis
+  - nt548
+  - devops
+
+home: https://github.com/Devop-Projects/nt548-config
+
+sources:
+  - https://github.com/Devop-Projects/NT548-DevOps
+  - https://github.com/Devop-Projects/nt548-config
+
+maintainers:
+  - name: Doan Van Tai
+    email: doanvantai@example.com
+    url: https://github.com/doanvantai
+
+# Không có dependencies — không dùng postgresql sub-chart vì có RDS
+# Nếu sau này cần in-cluster postgres cho test:
+# dependencies:
+#   - name: postgresql
+#     version: "15.5.0"
+#     repository: "https://charts.bitnami.com/bitnami"
+#     condition: postgresql.enabled

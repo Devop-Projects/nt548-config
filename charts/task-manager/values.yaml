@@ -1,0 +1,384 @@
+# charts/task-manager/values.yaml
+#
+# Default values for task-manager chart.
+# Override per-environment via values-{env}.yaml.
+#
+# Convention:
+# - Empty string "" = REQUIRED override (chart fail nếu không set)
+# - Có default value = optional override
+# - Boolean enabled: feature flag (bật/tắt component)
+
+# ════════════════════════════════════════════════════════════════
+# GLOBAL CONFIG
+# ════════════════════════════════════════════════════════════════
+global:
+  # Environment identifier — propagate vào labels & configs
+  environment: dev
+
+  # Cloud provider — ảnh hưởng Ingress class, Secret backend
+  # Values: "aws" | "local" | "gcp" (future)
+  cloud: aws
+
+  # Image pull policy mặc định
+  imagePullPolicy: IfNotPresent
+
+# ════════════════════════════════════════════════════════════════
+# NAMESPACE
+# ════════════════════════════════════════════════════════════════
+namespace:
+  # Tạo namespace từ chart hay không
+  # false: ArgoCD/admin tạo trước (recommended cho prod)
+  # true: chart tự tạo (tiện cho dev)
+  create: true
+  name: task-manager-dev
+
+  # PodSecurity Admission level
+  # Values: "privileged" | "baseline" | "restricted"
+  # Mode: "enforce" | "audit" | "warn"
+  podSecurity:
+    enforce: ""           # Để trống = không enforce (audit only)
+    audit: restricted
+    warn: restricted
+
+# ════════════════════════════════════════════════════════════════
+# RBAC & SERVICE ACCOUNTS
+# ════════════════════════════════════════════════════════════════
+serviceAccounts:
+  backend:
+    create: true
+    name: backend-sa
+    # Disable auto-mount K8s token (app không gọi K8s API)
+    automountToken: false
+
+  frontend:
+    create: true
+    name: frontend-sa
+    automountToken: false
+
+  postgres:
+    create: true
+    name: postgres-sa
+    automountToken: false
+
+# ════════════════════════════════════════════════════════════════
+# RESOURCE GOVERNANCE
+# ════════════════════════════════════════════════════════════════
+resourceQuota:
+  enabled: true
+  hard:
+    requests.cpu: "4"
+    requests.memory: "4Gi"
+    limits.cpu: "8"
+    limits.memory: "8Gi"
+    requests.storage: "20Gi"
+    persistentvolumeclaims: "5"
+    pods: "20"
+    services: "10"
+    configmaps: "10"
+    secrets: "10"
+
+limitRange:
+  enabled: true
+  default:
+    cpu: "500m"
+    memory: "512Mi"
+  defaultRequest:
+    cpu: "100m"
+    memory: "128Mi"
+  min:
+    cpu: "10m"
+    memory: "32Mi"
+  max:
+    cpu: "2"
+    memory: "2Gi"
+
+# ════════════════════════════════════════════════════════════════
+# BACKEND
+# ════════════════════════════════════════════════════════════════
+backend:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: doanvantai/nt548-backend
+    tag: "8ca1feb"        # CI sẽ update field này
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: http
+
+  # Pod-level security context
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+
+  # Container-level security context
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+  # App config (sẽ thành ConfigMap)
+  config:
+    NODE_ENV: production
+    LOG_LEVEL: info
+    PORT: "3000"
+    JWT_EXPIRES_IN: "7d"
+    DB_POOL_MAX: "10"
+    DB_POOL_MIN: "2"
+    # DB connection — override per-env
+    DB_HOST: "postgres"          # Default: in-cluster postgres
+    DB_PORT: "5432"
+    DB_NAME: "taskdb"
+    DB_USER: "taskuser"
+    DB_SSL: "false"
+
+  # External Secret config — chỉ enable trên AWS
+  externalSecret:
+    enabled: false
+    refreshInterval: 1h
+    secretStoreName: aws-secrets-manager
+    awsSecretName: ""            # Override: "devops/dev/backend/secrets"
+    dbSecretName: ""             # Override: "rds!db-xxxx-yyyy"
+
+  # Strategy
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  # Probes
+  probes:
+    startup:
+      enabled: true
+      path: /health/live
+      port: http
+      periodSeconds: 5
+      failureThreshold: 12      # 12 × 5s = 60s grace
+    liveness:
+      enabled: true
+      path: /health/live
+      port: http
+      periodSeconds: 30
+      timeoutSeconds: 5
+      failureThreshold: 3
+    readiness:
+      enabled: true
+      path: /health/ready
+      port: http
+      periodSeconds: 10
+      timeoutSeconds: 5
+      failureThreshold: 3
+
+  # Graceful shutdown
+  terminationGracePeriodSeconds: 30
+  preStopSleep: 5
+
+# ════════════════════════════════════════════════════════════════
+# FRONTEND
+# ════════════════════════════════════════════════════════════════
+frontend:
+  enabled: true
+  replicaCount: 2
+
+  image:
+    repository: doanvantai/nt548-frontend
+    tag: "8ca1feb"
+    pullPolicy: IfNotPresent
+
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8080
+
+  # Nginx Alpine runs as UID 101
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 101
+    runAsGroup: 101
+    fsGroup: 101
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+
+  probes:
+    liveness:
+      enabled: true
+      path: /
+      port: http
+      periodSeconds: 30
+      failureThreshold: 3
+    readiness:
+      enabled: true
+      path: /
+      port: http
+      periodSeconds: 10
+      failureThreshold: 2
+
+# ════════════════════════════════════════════════════════════════
+# POSTGRES (in-cluster — disable khi dùng RDS)
+# ════════════════════════════════════════════════════════════════
+postgres:
+  enabled: true                 # Default: enabled cho local dev
+  replicas: 1
+
+  image:
+    repository: postgres
+    tag: "15-alpine"
+    pullPolicy: IfNotPresent
+
+  # Postgres user UID trong Alpine = 70
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 70
+    runAsGroup: 70
+    fsGroup: 70
+
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: false   # PG cần ghi /var/lib/postgresql
+    capabilities:
+      drop: ["ALL"]
+    seccompProfile:
+      type: RuntimeDefault
+
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+  persistence:
+    enabled: true
+    storageClass: standard
+    size: 5Gi
+    accessMode: ReadWriteOnce
+
+  # ⚠️ Default password — OVERRIDE in production!
+  # Trong production, dùng External Secrets thay vì plain text
+  auth:
+    database: taskdb
+    username: taskuser
+    password: "taskpassword-strong"   # Override hoặc dùng existingSecret
+
+  # Use existing Secret thay vì tạo mới (cho production)
+  existingSecret: ""
+
+# ════════════════════════════════════════════════════════════════
+# DB MIGRATION JOB
+# ════════════════════════════════════════════════════════════════
+migration:
+  enabled: true
+  # Helm hook — chạy trước install/upgrade
+  hookType: "pre-install,pre-upgrade"
+  hookWeight: "-5"
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 300
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+# ════════════════════════════════════════════════════════════════
+# INGRESS
+# ════════════════════════════════════════════════════════════════
+ingress:
+  enabled: true
+  # Class: "nginx" cho local kind, "alb" cho AWS
+  className: nginx
+
+  # Annotations — override per-env (especially AWS ALB)
+  annotations: {}
+
+  hosts:
+    - host: taskmanager.local
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: backend
+          servicePort: 3000
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+          servicePort: 80
+
+  tls:
+    enabled: false
+    # secretName: task-manager-tls
+
+  # AWS ALB specific (chỉ dùng khi className = alb)
+  alb:
+    certificateArn: ""
+    healthcheckPath: /health/ready
+
+# ════════════════════════════════════════════════════════════════
+# NETWORK POLICIES (defense in depth)
+# ════════════════════════════════════════════════════════════════
+networkPolicies:
+  enabled: true
+  # Allow DNS to kube-system
+  allowDns: true
+  # Ingress controller namespace
+  ingressControllerNamespace: ingress-nginx
+
+# ════════════════════════════════════════════════════════════════
+# HORIZONTAL POD AUTOSCALER (chỉ enable cho prod)
+# ════════════════════════════════════════════════════════════════
+autoscaling:
+  enabled: false
+  backend:
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilization: 70
+    targetMemoryUtilization: 80
+
+# ════════════════════════════════════════════════════════════════
+# POD DISRUPTION BUDGET (chỉ prod)
+# ════════════════════════════════════════════════════════════════
+podDisruptionBudget:
+  enabled: false
+  backend:
+    minAvailable: 1
+  frontend:
+    minAvailable: 1

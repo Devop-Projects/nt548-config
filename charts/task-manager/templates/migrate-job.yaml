@@ -1,0 +1,83 @@
+{{- if .Values.migration.enabled -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  # Tên Job include Release.Revision để Job mới được tạo mỗi lần upgrade
+  name: {{ include "task-manager.fullname" . }}-db-migrate-{{ .Release.Revision }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+    app: db-migrate
+    app.kubernetes.io/component: migration
+  annotations:
+    # ⭐ Helm hook: chạy TRƯỚC install/upgrade
+    # Nếu Job fail → install/upgrade fail → app cũ giữ nguyên (atomic)
+    "helm.sh/hook": {{ .Values.migration.hookType }}
+    "helm.sh/hook-weight": {{ .Values.migration.hookWeight | quote }}
+    # Cleanup policy:
+    # - before-hook-creation: xóa Job cũ trước khi tạo mới
+    # - hook-succeeded: xóa Job khi succeed (giữ logs nếu fail để debug)
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: {{ .Values.migration.backoffLimit }}
+  ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
+
+  template:
+    metadata:
+      labels:
+        app: db-migrate
+        app.kubernetes.io/component: migration
+    spec:
+      restartPolicy: OnFailure
+      serviceAccountName: {{ .Values.serviceAccounts.backend.name }}
+      automountServiceAccountToken: false
+
+      securityContext:
+        {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
+
+      containers:
+      - name: migrate
+        image: {{ include "task-manager.backend.image" . }}
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+        command: ["node", "src/scripts/migrate.js"]
+
+        securityContext:
+          {{- toYaml .Values.backend.containerSecurityContext | nindent 10 }}
+
+        envFrom:
+        - configMapRef:
+            name: {{ include "task-manager.backend.fullname" . }}-config
+
+        env:
+        {{- if .Values.backend.externalSecret.enabled }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: DB_PASSWORD
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: DB_USERNAME
+        {{- else }}
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "task-manager.postgres.secretName" . }}
+              key: POSTGRES_PASSWORD
+        {{- end }}
+        - name: JWT_SECRET
+          value: "migration-placeholder-not-used"
+
+        resources:
+          {{- toYaml .Values.migration.resources | nindent 10 }}
+
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+{{- end }}

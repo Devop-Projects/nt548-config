@@ -1,0 +1,41 @@
+# Pattern syntax: Go filepath.Match (NO double-star **)
+# Helm sẽ match recursive tự động cho directory names (không cần **)
+
+# VCS
+.git
+.gitignore
+.bzr
+.hg
+.svn
+
+# Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*.bak
+*.tmp
+*.orig
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Helm artifacts
+*.tgz
+.helmignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Build / dependency dirs (Helm tự recurse)
+node_modules
+.helm
+.terraform
+
+# Testing output
+/tmp/
+*.rendered.yaml

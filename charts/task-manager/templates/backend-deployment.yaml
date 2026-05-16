@@ -1,0 +1,140 @@
+{{- if .Values.backend.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-manager.backend.fullname" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+
+  strategy:
+    type: {{ .Values.backend.strategy.type }}
+    {{- if eq .Values.backend.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      {{- toYaml .Values.backend.strategy.rollingUpdate | nindent 6 }}
+    {{- end }}
+
+  revisionHistoryLimit: 5
+
+  selector:
+    matchLabels:
+      {{- include "task-manager.backend.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "task-manager.backend.selectorLabels" . | nindent 8 }}
+      annotations:
+        # ⭐ Pattern quan trọng: ConfigMap checksum
+        # Khi ConfigMap đổi → checksum đổi → pod template đổi → rolling update
+        # Nếu không có, K8s không restart pod khi configmap đổi
+        checksum/config: {{ include (print $.Template.BasePath "/backend-configmap.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccounts.backend.name }}
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.backend.terminationGracePeriodSeconds }}
+
+      securityContext:
+        {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
+
+      containers:
+      - name: backend
+        image: {{ include "task-manager.backend.image" . }}
+        imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+
+        ports:
+        - name: http
+          containerPort: 3000
+          protocol: TCP
+
+        securityContext:
+          {{- toYaml .Values.backend.containerSecurityContext | nindent 10 }}
+
+        # ─── Config từ ConfigMap ───
+        envFrom:
+        - configMapRef:
+            name: {{ include "task-manager.backend.fullname" . }}-config
+
+        # ─── Secrets ───
+        env:
+        {{- if .Values.backend.externalSecret.enabled }}
+        # AWS mode: secrets từ External Secrets Operator
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: DB_PASSWORD
+        - name: DB_USER
+          valueFrom:
+            secretKeyRef:
+              name: db-credentials
+              key: DB_USERNAME
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: JWT_SECRET
+        {{- else }}
+        # Local mode: secrets từ in-cluster Secrets
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "task-manager.postgres.secretName" . }}
+              key: POSTGRES_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backend-secrets
+              key: JWT_SECRET
+        {{- end }}
+
+        resources:
+          {{- toYaml .Values.backend.resources | nindent 10 }}
+
+        # ─── Probes ───
+        {{- if .Values.backend.probes.startup.enabled }}
+        startupProbe:
+          httpGet:
+            path: {{ .Values.backend.probes.startup.path }}
+            port: {{ .Values.backend.probes.startup.port }}
+          periodSeconds: {{ .Values.backend.probes.startup.periodSeconds }}
+          failureThreshold: {{ .Values.backend.probes.startup.failureThreshold }}
+        {{- end }}
+
+        {{- if .Values.backend.probes.liveness.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.backend.probes.liveness.path }}
+            port: {{ .Values.backend.probes.liveness.port }}
+          periodSeconds: {{ .Values.backend.probes.liveness.periodSeconds }}
+          timeoutSeconds: {{ .Values.backend.probes.liveness.timeoutSeconds }}
+          failureThreshold: {{ .Values.backend.probes.liveness.failureThreshold }}
+        {{- end }}
+
+        {{- if .Values.backend.probes.readiness.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.backend.probes.readiness.path }}
+            port: {{ .Values.backend.probes.readiness.port }}
+          periodSeconds: {{ .Values.backend.probes.readiness.periodSeconds }}
+          timeoutSeconds: {{ .Values.backend.probes.readiness.timeoutSeconds }}
+          failureThreshold: {{ .Values.backend.probes.readiness.failureThreshold }}
+        {{- end }}
+
+        # ─── Graceful shutdown ───
+        lifecycle:
+          preStop:
+            exec:
+              command: ["sh", "-c", "sleep {{ .Values.backend.preStopSleep }}"]
+
+        # ─── Volume mounts (cho read-only fs) ───
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+
+      volumes:
+      - name: tmp
+        emptyDir: {}
+{{- end }}

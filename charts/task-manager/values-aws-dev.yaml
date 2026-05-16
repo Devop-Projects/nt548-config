@@ -1,0 +1,76 @@
+# values-aws-dev.yaml — AWS dev environment
+#
+# Differs from values-dev.yaml:
+# - RDS (postgres.enabled=false)
+# - External Secrets (JWT + DB password from AWS Secrets Manager)
+# - AWS ALB Ingress
+
+global:
+  environment: dev
+  cloud: aws
+
+namespace:
+  create: true
+  name: task-manager-dev
+
+backend:
+  replicaCount: 2
+  image:
+    repository: doanvantai/nt548-backend
+    tag: "8ca1feb"          # CI sẽ update
+  config:
+    LOG_LEVEL: info
+    # ⚠️ Update theo RDS endpoint thực tế:
+    DB_HOST: "devops-dev-db.chi0awig8v33.ap-southeast-1.rds.amazonaws.com"
+    DB_PORT: "5432"
+    DB_NAME: "appdb"
+    DB_USER: "appuser"
+    DB_SSL: "true"
+  externalSecret:
+    enabled: true
+    refreshInterval: 1h
+    secretStoreName: aws-secrets-manager
+    awsSecretName: "devops/dev/backend/secrets"
+    # ⚠️ Update theo RDS secret thực tế:
+    dbSecretName: "rds!db-1a707e7b-e8f5-4b39-a92f-1a6cdc3a36ef"
+
+frontend:
+  replicaCount: 2
+  image:
+    repository: doanvantai/nt548-frontend
+    tag: "8ca1feb"
+
+# Tắt postgres in-cluster (dùng RDS thay)
+postgres:
+  enabled: false
+
+ingress:
+  enabled: true
+  className: alb
+  alb:
+    # ⚠️ Update theo ACM cert thực tế:
+    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/4b2b243d-5c96-4fa2-b213-b42d5e79ddf2"
+    healthcheckPath: /health/ready
+  hosts:
+    - host: task-manager.vantai.click
+      paths:
+        - path: /api
+          pathType: Prefix
+          serviceName: backend
+          servicePort: 3000
+        - path: /
+          pathType: Prefix
+          serviceName: frontend
+          servicePort: 80
+  tls:
+    enabled: false   # ALB handle TLS via certArn, không cần K8s TLS secret
+
+networkPolicies:
+  enabled: true
+  ingressControllerNamespace: ingress-nginx   # Adjust nếu cần
+
+autoscaling:
+  enabled: false   # Dev không cần HPA
+
+podDisruptionBudget:
+  enabled: false

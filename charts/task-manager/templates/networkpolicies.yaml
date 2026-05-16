@@ -1,0 +1,145 @@
+{{- if .Values.networkPolicies.enabled -}}
+# Default deny all
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+
+{{- if .Values.networkPolicies.allowDns }}
+---
+# Allow DNS egress (CRITICAL - không có sẽ làm app treo)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - port: 53
+      protocol: UDP
+    - port: 53
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.frontend.enabled }}
+---
+# Frontend: cho phép Ingress controller gọi vào
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-ingress
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.frontend.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: frontend
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.networkPolicies.ingressControllerNamespace }}
+    ports:
+    - port: 8080
+      protocol: TCP
+{{- end }}
+
+{{- if .Values.backend.enabled }}
+---
+# Backend: cho phép Ingress controller gọi vào
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-ingress
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: {{ .Values.networkPolicies.ingressControllerNamespace }}
+    ports:
+    - port: 3000
+      protocol: TCP
+{{- end }}
+
+{{- if and .Values.backend.enabled .Values.postgres.enabled }}
+---
+# Backend egress: chỉ cho phép gọi Postgres
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-egress-postgres
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: backend
+  policyTypes: [Egress]
+  egress:
+  - to:
+    - podSelector:
+        matchLabels:
+          app: postgres
+    ports:
+    - port: 5432
+      protocol: TCP
+
+---
+# Postgres ingress: chỉ accept từ backend
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: postgres-ingress
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.postgres.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes: [Ingress]
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: backend
+    - podSelector:
+        matchLabels:
+          app: db-migrate
+    ports:
+    - port: 5432
+      protocol: TCP
+{{- end }}
+
+{{- end }}

@@ -1,0 +1,84 @@
+{{- if .Values.frontend.enabled -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "task-manager.frontend.fullname" . }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.frontend.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+
+  strategy:
+    type: {{ .Values.frontend.strategy.type }}
+    {{- if eq .Values.frontend.strategy.type "RollingUpdate" }}
+    rollingUpdate:
+      {{- toYaml .Values.frontend.strategy.rollingUpdate | nindent 6 }}
+    {{- end }}
+
+  selector:
+    matchLabels:
+      {{- include "task-manager.frontend.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      labels:
+        {{- include "task-manager.frontend.selectorLabels" . | nindent 8 }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccounts.frontend.name }}
+      automountServiceAccountToken: false
+
+      securityContext:
+        {{- toYaml .Values.frontend.podSecurityContext | nindent 8 }}
+
+      containers:
+      - name: frontend
+        image: {{ include "task-manager.frontend.image" . }}
+        imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+
+        securityContext:
+          {{- toYaml .Values.frontend.containerSecurityContext | nindent 10 }}
+
+        resources:
+          {{- toYaml .Values.frontend.resources | nindent 10 }}
+
+        {{- if .Values.frontend.probes.liveness.enabled }}
+        livenessProbe:
+          httpGet:
+            path: {{ .Values.frontend.probes.liveness.path }}
+            port: {{ .Values.frontend.probes.liveness.port }}
+          periodSeconds: {{ .Values.frontend.probes.liveness.periodSeconds }}
+          failureThreshold: {{ .Values.frontend.probes.liveness.failureThreshold }}
+        {{- end }}
+
+        {{- if .Values.frontend.probes.readiness.enabled }}
+        readinessProbe:
+          httpGet:
+            path: {{ .Values.frontend.probes.readiness.path }}
+            port: {{ .Values.frontend.probes.readiness.port }}
+          periodSeconds: {{ .Values.frontend.probes.readiness.periodSeconds }}
+          failureThreshold: {{ .Values.frontend.probes.readiness.failureThreshold }}
+        {{- end }}
+
+        # Volume mounts cho nginx writable dirs (read-only fs)
+        volumeMounts:
+        - name: nginx-cache
+          mountPath: /var/cache/nginx
+        - name: nginx-run
+          mountPath: /var/run
+        - name: tmp
+          mountPath: /tmp
+
+      volumes:
+      - name: nginx-cache
+        emptyDir: {}
+      - name: nginx-run
+        emptyDir: {}
+      - name: tmp
+        emptyDir: {}
+{{- end }}
