@@ -8,16 +8,14 @@
 global:
   environment: dev
   cloud: aws
-
 namespace:
   create: true
   name: task-manager-dev
-
 backend:
   replicaCount: 2
   image:
     repository: doanvantai/nt548-backend
-    tag: "8ca1feb"          # CI sẽ update
+    tag: "ec76318" # CI sẽ update
   config:
     LOG_LEVEL: info
     # ⚠️ Update theo RDS endpoint thực tế:
@@ -33,17 +31,14 @@ backend:
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
     dbSecretName: "rds!db-1a707e7b-e8f5-4b39-a92f-1a6cdc3a36ef"
-
 frontend:
   replicaCount: 2
   image:
     repository: doanvantai/nt548-frontend
-    tag: "8ca1feb"
-
+    tag: "ec76318"
 # Tắt postgres in-cluster (dùng RDS thay)
 postgres:
   enabled: false
-
 ingress:
   enabled: true
   className: alb
@@ -63,14 +58,11 @@ ingress:
           serviceName: frontend
           servicePort: 80
   tls:
-    enabled: false   # ALB handle TLS via certArn, không cần K8s TLS secret
-
+    enabled: false # ALB handle TLS via certArn, không cần K8s TLS secret
 networkPolicies:
   enabled: true
-  ingressControllerNamespace: ingress-nginx   # Adjust nếu cần
-
+  ingressControllerNamespace: ingress-nginx # Adjust nếu cần
 autoscaling:
-  enabled: false   # Dev không cần HPA
-
+  enabled: false # Dev không cần HPA
 podDisruptionBudget:
   enabled: false
