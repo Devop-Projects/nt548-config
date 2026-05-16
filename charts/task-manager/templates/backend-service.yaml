@@ -1,9 +1,17 @@
 {{- if .Values.backend.enabled -}}
+{{/*
+Service "backend" — luôn tạo, là entry point chính.
+
+Khi rollout.enabled=true:
+- Argo Rollouts inject "rollouts-pod-template-hash" vào selector
+- Service trỏ vào pods của ACTIVE (blue-green) hoặc STABLE (canary) ReplicaSet
+
+Khi rollout.enabled=false:
+- Standard service trỏ vào Deployment pods
+*/}}
 apiVersion: v1
 kind: Service
 metadata:
-  # Pattern: tên service đơn giản (không có release name)
-  # vì frontend Nginx hardcode "backend" trong proxy_pass
   name: backend
   namespace: {{ .Values.namespace.name }}
   labels:
@@ -17,4 +25,48 @@ spec:
     port: {{ .Values.backend.service.port }}
     targetPort: {{ .Values.backend.service.targetPort }}
     protocol: TCP
+
+{{/* ─── Preview service (Blue-Green) ─── */}}
+{{- if and .Values.backend.rollout.enabled (eq .Values.backend.rollout.strategy "blueGreen") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.rollout.blueGreen.previewService }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+    role: preview
+spec:
+  type: {{ .Values.backend.service.type }}
+  selector:
+    {{- include "task-manager.backend.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: http
+    port: {{ .Values.backend.service.port }}
+    targetPort: {{ .Values.backend.service.targetPort }}
+    protocol: TCP
+{{- end }}
+
+{{/* ─── Canary service ─── */}}
+{{- if and .Values.backend.rollout.enabled (eq .Values.backend.rollout.strategy "canary") }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.backend.rollout.canary.canaryService }}
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+    role: canary
+spec:
+  type: {{ .Values.backend.service.type }}
+  selector:
+    {{- include "task-manager.backend.selectorLabels" . | nindent 4 }}
+  ports:
+  - name: http
+    port: {{ .Values.backend.service.port }}
+    targetPort: {{ .Values.backend.service.targetPort }}
+    protocol: TCP
+{{- end }}
 {{- end }}

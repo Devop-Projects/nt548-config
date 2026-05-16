@@ -190,6 +190,80 @@ backend:
   terminationGracePeriodSeconds: 30
   preStopSleep: 5
 
+  # ════════════════════════════════════════════════════════════════
+  # PROGRESSIVE DELIVERY (Argo Rollouts)
+  # ════════════════════════════════════════════════════════════════
+  rollout:
+    # Bật/tắt: false = dùng Deployment thường, true = dùng Rollout CRD
+    enabled: false
+
+    # Strategy: "blueGreen" or "canary"
+    strategy: "blueGreen"
+
+    # ─── Blue-Green config ───
+    blueGreen:
+      # Service names — sẽ được Argo Rollouts manage
+      activeService: backend
+      previewService: backend-preview
+
+      # Auto-promote? false = manual, true = tự promote sau analysis pass
+      autoPromotionEnabled: false
+
+      # Hoặc auto-promote sau N giây (override autoPromotionEnabled)
+      # autoPromotionSeconds: 600
+
+      # Đợi bao lâu trước khi scale down phiên bản cũ
+      scaleDownDelaySeconds: 30
+
+      # Pre-promotion analysis (trước khi switch)
+      prePromotionAnalysis:
+        enabled: false                # Bật khi có AnalysisTemplate ready
+        templates:
+          - smoke-tests
+
+      # Post-promotion analysis (sau khi switch)
+      postPromotionAnalysis:
+        enabled: false
+        templates:
+          - success-rate-web
+
+    # ─── Canary config ───
+    canary:
+      # Service names
+      stableService: backend
+      canaryService: backend-canary
+
+      # Traffic routing (advanced, optional)
+      trafficRouting:
+        enabled: false   # Pod-count approximation cho đơn giản
+
+      # Background analysis
+      analysis:
+        enabled: false
+        startingStep: 1
+        templates:
+          - success-rate-web
+
+      # Steps — gradient progression
+      steps:
+        - setWeight: 20
+        - pause:
+            duration: 2m
+        - setWeight: 40
+        - pause:
+            duration: 2m
+        - setWeight: 60
+        - pause:
+            duration: 2m
+        - setWeight: 80
+        - pause:
+            duration: 2m
+        # Step cuối auto = 100%
+
+      scaleDownDelaySeconds: 60
+      maxSurge: "25%"
+      maxUnavailable: 0
+
 # ════════════════════════════════════════════════════════════════
 # FRONTEND
 # ════════════════════════════════════════════════════════════════

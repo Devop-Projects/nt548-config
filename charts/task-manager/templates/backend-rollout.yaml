@@ -1,6 +1,18 @@
-{{- if and .Values.backend.enabled (not .Values.backend.rollout.enabled) -}}
-apiVersion: apps/v1
-kind: Deployment
+{{/*
+═══════════════════════════════════════════════════════════════════
+templates/backend-rollout.yaml
+
+Argo Rollouts Rollout CRD — drop-in replacement cho Deployment.
+Chỉ render khi backend.rollout.enabled = true.
+
+Structure y hệt Deployment, chỉ khác:
+- kind: Rollout
+- spec.strategy: blueGreen | canary
+═══════════════════════════════════════════════════════════════════
+*/}}
+{{- if and .Values.backend.enabled .Values.backend.rollout.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: Rollout
 metadata:
   name: {{ include "task-manager.backend.fullname" . }}
   namespace: {{ .Values.namespace.name }}
@@ -8,28 +20,81 @@ metadata:
     {{- include "task-manager.backend.labels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.backend.replicaCount }}
-
-  strategy:
-    type: {{ .Values.backend.strategy.type }}
-    {{- if eq .Values.backend.strategy.type "RollingUpdate" }}
-    rollingUpdate:
-      {{- toYaml .Values.backend.strategy.rollingUpdate | nindent 6 }}
-    {{- end }}
-
   revisionHistoryLimit: 5
 
   selector:
     matchLabels:
       {{- include "task-manager.backend.selectorLabels" . | nindent 6 }}
 
+  # ─── STRATEGY ───
+  strategy:
+    {{- if eq .Values.backend.rollout.strategy "blueGreen" }}
+    blueGreen:
+      activeService: {{ .Values.backend.rollout.blueGreen.activeService }}
+      previewService: {{ .Values.backend.rollout.blueGreen.previewService }}
+
+      autoPromotionEnabled: {{ .Values.backend.rollout.blueGreen.autoPromotionEnabled }}
+      {{- with .Values.backend.rollout.blueGreen.autoPromotionSeconds }}
+      autoPromotionSeconds: {{ . }}
+      {{- end }}
+
+      scaleDownDelaySeconds: {{ .Values.backend.rollout.blueGreen.scaleDownDelaySeconds }}
+
+      {{- if .Values.backend.rollout.blueGreen.prePromotionAnalysis.enabled }}
+      prePromotionAnalysis:
+        templates:
+          {{- range .Values.backend.rollout.blueGreen.prePromotionAnalysis.templates }}
+          - templateName: {{ . }}
+          {{- end }}
+        args:
+          - name: service-name
+            value: {{ .Values.backend.rollout.blueGreen.previewService }}
+      {{- end }}
+
+      {{- if .Values.backend.rollout.blueGreen.postPromotionAnalysis.enabled }}
+      postPromotionAnalysis:
+        templates:
+          {{- range .Values.backend.rollout.blueGreen.postPromotionAnalysis.templates }}
+          - templateName: {{ . }}
+          {{- end }}
+        args:
+          - name: service-name
+            value: {{ .Values.backend.rollout.blueGreen.activeService }}
+      {{- end }}
+    {{- end }}
+
+    {{- if eq .Values.backend.rollout.strategy "canary" }}
+    canary:
+      stableService: {{ .Values.backend.rollout.canary.stableService }}
+      canaryService: {{ .Values.backend.rollout.canary.canaryService }}
+
+      maxSurge: {{ .Values.backend.rollout.canary.maxSurge | quote }}
+      maxUnavailable: {{ .Values.backend.rollout.canary.maxUnavailable }}
+      scaleDownDelaySeconds: {{ .Values.backend.rollout.canary.scaleDownDelaySeconds }}
+
+      {{- if .Values.backend.rollout.canary.analysis.enabled }}
+      analysis:
+        startingStep: {{ .Values.backend.rollout.canary.analysis.startingStep }}
+        templates:
+          {{- range .Values.backend.rollout.canary.analysis.templates }}
+          - templateName: {{ . }}
+          {{- end }}
+        args:
+          - name: service-name
+            value: {{ .Values.backend.rollout.canary.canaryService }}
+      {{- end }}
+
+      steps:
+        {{- toYaml .Values.backend.rollout.canary.steps | nindent 8 }}
+    {{- end }}
+
+  # ─── TEMPLATE — y hệt Deployment ───
   template:
     metadata:
       labels:
         {{- include "task-manager.backend.selectorLabels" . | nindent 8 }}
       annotations:
-        # ⭐ Pattern quan trọng: ConfigMap checksum
-        # Khi ConfigMap đổi → checksum đổi → pod template đổi → rolling update
-        # Nếu không có, K8s không restart pod khi configmap đổi
+        # ConfigMap checksum — auto restart khi config đổi
         checksum/config: {{ include (print $.Template.BasePath "/backend-configmap.yaml") . | sha256sum }}
     spec:
       serviceAccountName: {{ .Values.serviceAccounts.backend.name }}
@@ -52,15 +117,12 @@ spec:
         securityContext:
           {{- toYaml .Values.backend.containerSecurityContext | nindent 10 }}
 
-        # ─── Config từ ConfigMap ───
         envFrom:
         - configMapRef:
             name: {{ include "task-manager.backend.fullname" . }}-config
 
-        # ─── Secrets ───
         env:
         {{- if .Values.backend.externalSecret.enabled }}
-        # AWS mode: secrets từ External Secrets Operator
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -77,7 +139,6 @@ spec:
               name: backend-secrets
               key: JWT_SECRET
         {{- else }}
-        # Local mode: secrets từ in-cluster Secrets
         - name: POSTGRES_PASSWORD
           valueFrom:
             secretKeyRef:
@@ -93,7 +154,6 @@ spec:
         resources:
           {{- toYaml .Values.backend.resources | nindent 10 }}
 
-        # ─── Probes ───
         {{- if .Values.backend.probes.startup.enabled }}
         startupProbe:
           httpGet:
@@ -123,13 +183,11 @@ spec:
           failureThreshold: {{ .Values.backend.probes.readiness.failureThreshold }}
         {{- end }}
 
-        # ─── Graceful shutdown ───
         lifecycle:
           preStop:
             exec:
               command: ["sh", "-c", "sleep {{ .Values.backend.preStopSleep }}"]
 
-        # ─── Volume mounts (cho read-only fs) ───
         volumeMounts:
         - name: tmp
           mountPath: /tmp
