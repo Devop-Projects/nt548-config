@@ -1,7 +1,7 @@
 # platform/argocd/apps/task-manager-dev.yaml
 #
-# ArgoCD Application: deploy task-manager vào dev env.
-# File này được quản lý bởi root App-of-Apps.
+# ArgoCD Application using Helm chart.
+# Migrated from Kustomize on $(date +%Y-%m-%d).
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -14,10 +14,22 @@ spec:
   project: default
 
   source:
-    # ⚠️ ĐỔI THÀNH URL CONFIG REPO CỦA BẠN
     repoURL: https://github.com/Devop-Projects/nt548-config.git
     targetRevision: main
-    path: apps/task-manager/overlays/dev
+    # ⭐ Trỏ vào folder chứa Chart.yaml (không phải overlay nữa)
+    path: charts/task-manager
+
+    # ⭐ Helm-specific config
+    helm:
+      releaseName: task-manager
+      valueFiles:
+        - values.yaml             # Base defaults
+        - values-aws-dev.yaml     # Environment overrides
+
+      # Optional: override values inline (use sparingly)
+      # parameters:
+      #   - name: backend.image.tag
+      #     value: "abc123"
 
   destination:
     server: https://kubernetes.default.svc
@@ -32,6 +44,8 @@ spec:
       - CreateNamespace=true
       - ServerSideApply=true
       - PruneLast=true
+      # Helm hooks → ArgoCD PreSync/PostSync
+      # ArgoCD tự handle, không cần option đặc biệt
     retry:
       limit: 5
       backoff:
