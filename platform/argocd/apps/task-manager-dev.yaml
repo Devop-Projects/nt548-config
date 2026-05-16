@@ -35,23 +35,23 @@ spec:
     server: https://kubernetes.default.svc
     namespace: task-manager-dev
 
-  # syncPolicy:
-  #   automated:
-  #     prune: true
-  #     selfHeal: true
-  #     allowEmpty: false
-  #   syncOptions:
-  #     - CreateNamespace=true
-  #     - ServerSideApply=true
-  #     - PruneLast=true
-  #     # Helm hooks → ArgoCD PreSync/PostSync
-  #     # ArgoCD tự handle, không cần option đặc biệt
-  #   retry:
-  #     limit: 5
-  #     backoff:
-  #       duration: 5s
-  #       factor: 2
-  #       maxDuration: 3m
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PruneLast=true
+      # Helm hooks → ArgoCD PreSync/PostSync
+      # ArgoCD tự handle, không cần option đặc biệt
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
 
   revisionHistoryLimit: 10
 
