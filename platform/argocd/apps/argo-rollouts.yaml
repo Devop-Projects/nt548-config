@@ -1,0 +1,60 @@
+# platform/argocd/apps/argo-rollouts.yaml
+#
+# Cài Argo Rollouts controller vào cluster qua GitOps.
+# ArgoCD sẽ manage controller như một app bình thường.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: argo-rollouts
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://argoproj.github.io/argo-helm
+    chart: argo-rollouts
+    targetRevision: 2.37.7   # Latest stable as of 2026
+
+    helm:
+      releaseName: argo-rollouts
+      values: |
+        # Install CRDs (Rollout, AnalysisTemplate, etc.)
+        installCRDs: true
+
+        controller:
+          # 2 replicas cho HA (cluster có 2+ nodes)
+          replicas: 2
+          metrics:
+            enabled: true
+            serviceMonitor:
+              enabled: false   # Sẽ enable ở Phase 7 (Prometheus)
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+
+        # Dashboard (UI)
+        dashboard:
+          enabled: true
+          replicas: 1
+          service:
+            type: ClusterIP    # Port-forward để access
+            port: 3100
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argo-rollouts
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
