@@ -2,25 +2,16 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  # ⭐ FIX 1: Name dựa trên image SHA hash
-  # → Mỗi image change = unique name → không conflict
   name: {{ include "task-manager.fullname" . }}-db-migrate-{{ include "task-manager.backend.image" . | sha256sum | trunc 8 }}
   namespace: {{ .Values.namespace.name }}
   labels:
     {{- include "task-manager.labels" . | nindent 4 }}
     app: db-migrate
     app.kubernetes.io/component: migration
-  annotations:
-    "helm.sh/hook": pre-install,pre-upgrade
-    "helm.sh/hook-weight": "-5"
-    # ⭐ FIX 2: hook-failed → auto cleanup khi Job fail
-    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded,hook-failed
 spec:
   backoffLimit: {{ .Values.migration.backoffLimit }}
   ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
-  # ⭐ FIX 3: Tự fail sau 5 phút → chống stuck mãi
   activeDeadlineSeconds: 300
-
   template:
     metadata:
       labels:
@@ -30,23 +21,18 @@ spec:
       restartPolicy: OnFailure
       serviceAccountName: {{ .Values.serviceAccounts.backend.name }}
       automountServiceAccountToken: false
-
       securityContext:
         {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
-
       containers:
       - name: migrate
         image: {{ include "task-manager.backend.image" . }}
         imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
         command: ["node", "src/scripts/migrate.js"]
-
         securityContext:
           {{- toYaml .Values.backend.containerSecurityContext | nindent 10 }}
-
         envFrom:
         - configMapRef:
             name: {{ include "task-manager.backend.fullname" . }}-config
-
         env:
         {{- if .Values.backend.externalSecret.enabled }}
         - name: POSTGRES_PASSWORD
@@ -68,14 +54,11 @@ spec:
         {{- end }}
         - name: JWT_SECRET
           value: "migration-placeholder-not-used"
-
         resources:
           {{- toYaml .Values.migration.resources | nindent 10 }}
-
         volumeMounts:
         - name: tmp
           mountPath: /tmp
-
       volumes:
       - name: tmp
         emptyDir: {}
