@@ -35,14 +35,19 @@ backend:
   rollout:
     enabled: true
     strategy: blueGreen
+    analysisTemplates:
+      enabled: true
     blueGreen:
       activeService: backend
       previewService: backend-preview
       autoPromotionEnabled: false
       scaleDownDelaySeconds: 30
-      prePromotionAnalysis:
-        enabled: false
-        templates: []
+
+       prePromotionAnalysis:
+        enabled: true
+        templates:
+          - success-rate-web
+        
       postPromotionAnalysis:
         enabled: false
         templates: []

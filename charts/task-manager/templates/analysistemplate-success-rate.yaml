@@ -1,0 +1,71 @@
+{{/*
+═══════════════════════════════════════════════════════════════════
+templates/analysistemplate-success-rate.yaml
+
+AnalysisTemplate cho automated rollback verification.
+
+⚠️ TẠI SAO 'web' provider, không phải 'prometheus'?
+   Phase 6 này chưa có Prometheus (sẽ setup ở Phase 7).
+   'web' provider HTTP-probe app endpoint trực tiếp — đủ verify
+   app đang Ready hay không. Khi có Prometheus (Phase 7),
+   thay 'web' bằng 'prometheus' với PromQL query → robust hơn.
+
+⚠️ TRADE-OFF của 'web' provider:
+   ✅ Đơn giản, không cần observability stack
+   ✅ Đủ để demo concept
+   ❌ Chỉ check binary "Ready / Not Ready", không phải metric thật
+   ❌ Không đo được error rate, latency p99, throughput
+   → Phase 7 sẽ enrich với Prometheus queries thực sự
+═══════════════════════════════════════════════════════════════════
+*/}}
+{{- if and .Values.backend.enabled .Values.backend.rollout.enabled -}}
+{{- if .Values.backend.rollout.analysisTemplates.enabled -}}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate-web
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  # ─── ARGS: tham số từ Rollout truyền vào ───
+  args:
+    - name: service-name
+      # Rollout sẽ truyền: value = "backend-preview" (cho prePromotion)
+      #                hoặc value = "backend"         (cho postPromotion)
+
+  # ─── METRICS: định nghĩa các phép đo ───
+  metrics:
+    - name: http-success-rate
+
+      # ⭐ Đo mỗi 30s, tổng 5 lần = 2.5 phút analysis
+      interval: 30s
+      count: 5
+
+      # ⭐ Điều kiện PASS:
+      # Endpoint /health/ready trả về JSON {"status":"ready",...}
+      # Extract field .status, so sánh với "ready"
+      successCondition: result == "ready"
+
+      # ⭐ Cho phép 2 lần fail. Lần thứ 3 fail → ABORT ngay
+      failureLimit: 2
+
+      # ⭐ Initial delay: đợi pods stabilize trước probe đầu tiên
+      # Quan trọng! Pod vừa Ready không có nghĩa app đã warm up
+      initialDelay: 30s
+
+      provider:
+        web:
+          # URL gốc — Rollout sẽ replace {{args.service-name}} runtime
+          # DNS format: <service>.<namespace>.svc.cluster.local
+          url: "http://{{`{{args.service-name}}`}}.{{ .Values.namespace.name }}.svc.cluster.local:3000/health/ready"
+          
+          # Timeout cho từng HTTP request
+          timeoutSeconds: 10
+          
+          # ⭐ JSON parsing — extract field .status từ response
+          # Example response: {"status":"ready","dependencies":{"database":"ok"}}
+          # jsonPath "{$.status}" → "ready"
+          jsonPath: "{$.status}"
+{{- end }}
+{{- end }}
