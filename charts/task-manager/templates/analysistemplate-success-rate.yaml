@@ -31,8 +31,8 @@ spec:
   # ─── ARGS: tham số từ Rollout truyền vào ───
   args:
     - name: service-name
-      # Rollout sẽ truyền: value = "backend-preview" (cho prePromotion)
-      #                hoặc value = "backend"         (cho postPromotion)
+      # Rollout sẽ truyền: value = "backend-preview" cho prePromotion
+      #                hoặc value = "backend" cho postPromotion
 
   # ─── METRICS: định nghĩa các phép đo ───
   metrics:
@@ -56,13 +56,13 @@ spec:
 
       provider:
         web:
-          # URL gốc — Rollout sẽ replace {{args.service-name}} runtime
+          # URL gốc — Rollout sẽ thay service-name ở runtime
           # DNS format: <service>.<namespace>.svc.cluster.local
           url: "http://{{`{{args.service-name}}`}}.{{ .Values.namespace.name }}.svc.cluster.local:3000/health/ready"
-          
+
           # Timeout cho từng HTTP request
           timeoutSeconds: 10
-          
+
           # ⭐ JSON parsing — extract field .status từ response
           # Example response: {"status":"ready","dependencies":{"database":"ok"}}
           # jsonPath "{$.status}" → "ready"

@@ -15,7 +15,7 @@ backend:
   replicaCount: 2
   image:
     repository: doanvantai/nt548-backend
-    tag: "7691d7c" # CI sẽ update
+    tag: "ec76318" # CI sẽ update
   config:
     LOG_LEVEL: info
     # ⚠️ Update theo RDS endpoint thực tế:
@@ -42,12 +42,10 @@ backend:
       previewService: backend-preview
       autoPromotionEnabled: false
       scaleDownDelaySeconds: 30
-
-       prePromotionAnalysis:
+      prePromotionAnalysis:
         enabled: true
         templates:
           - success-rate-web
-        
       postPromotionAnalysis:
         enabled: false
         templates: []
