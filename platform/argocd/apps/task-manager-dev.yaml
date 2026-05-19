@@ -69,3 +69,10 @@ spec:
       kind: ReplicaSet
       jqPathExpressions:
         - '.metadata.labels["rollouts-pod-template-hash"]'
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jqPathExpressions:
+        - '.spec.data[].remoteRef.conversionStrategy'
+        - '.spec.data[].remoteRef.decodingStrategy'
+        - '.spec.data[].remoteRef.metadataPolicy'
+  
