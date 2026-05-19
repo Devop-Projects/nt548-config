@@ -60,3 +60,12 @@ spec:
       kind: Deployment
       jsonPointers:
         - /spec/replicas
+    
+    - group: ""
+      kind: Service
+      jqPathExpressions:
+        - '.spec.selector["rollouts-pod-template-hash"]'
+    - group: apps
+      kind: ReplicaSet
+      jqPathExpressions:
+        - '.metadata.labels["rollouts-pod-template-hash"]'

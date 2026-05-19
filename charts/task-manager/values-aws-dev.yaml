@@ -31,6 +31,20 @@ backend:
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
     dbSecretName: "rds!db-987c0441-43a9-4fd5-9856-644e7ce79d2b"
+  rollout:
+    enabled: true
+    strategy: blueGreen
+    blueGreen:
+      activeService: backend
+      previewService: backend-preview
+      autoPromotionEnabled: false
+      scaleDownDelaySeconds: 30
+      prePromotionAnalysis:
+        enabled: false
+        templates: []
+      postPromotionAnalysis:
+        enabled: false
+        templates: []
 frontend:
   replicaCount: 2
   image:
