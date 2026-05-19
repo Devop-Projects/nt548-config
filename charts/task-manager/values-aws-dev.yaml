@@ -30,7 +30,7 @@ backend:
     secretStoreName: aws-secrets-manager
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
-    dbSecretName: "rds!db-34ae3b06-5014-4173-bec4-a4887a337ce9"
+    dbSecretName: "rds!db-987c0441-43a9-4fd5-9856-644e7ce79d2b"
 frontend:
   replicaCount: 2
   image:
@@ -44,7 +44,7 @@ ingress:
   className: alb
   alb:
     # ⚠️ Update theo ACM cert thực tế:
-    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/1a7e5961-dd9e-46c0-892e-dbe4294c290a"
+    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/159a84b7-9e3a-4e50-90bd-966a4d4a1390"
     healthcheckPath: /health/ready
   hosts:
     - host: task-manager.vantai.click
