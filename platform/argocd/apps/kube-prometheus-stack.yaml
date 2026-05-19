@@ -1,0 +1,136 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kube-prometheus-stack
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  # CRDs to ignore (Helm + Operator hay tạo lệch diff)
+  ignoreDifferences:
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jsonPointers:
+        - /spec/preserveUnknownFields
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - '.webhooks[]?.clientConfig.caBundle'
+
+  source:
+    repoURL: https://prometheus-community.github.io/helm-charts
+    chart: kube-prometheus-stack
+    targetRevision: 62.7.0     # ⚠️ pin version cho reproducibility
+    helm:
+      releaseName: kube-prometheus-stack
+      values: |
+        # ─── Prometheus ────────────────────────────
+        prometheus:
+          prometheusSpec:
+            # Retention: 15 ngày cho dev (tradeoff storage/history)
+            retention: 15d
+            retentionSize: "8GB"
+
+            # Discover ServiceMonitor từ tất cả namespace
+            # Mặc định nó CHỈ match release label → false sẽ catch mọi SM
+            serviceMonitorSelectorNilUsesHelmValues: false
+            podMonitorSelectorNilUsesHelmValues: false
+            ruleSelectorNilUsesHelmValues: false
+
+            # Storage
+            storageSpec:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 10Gi
+
+            # Resources
+            resources:
+              requests:
+                cpu: 200m
+                memory: 1Gi
+              limits:
+                cpu: 1000m
+                memory: 2Gi
+
+            # Scrape config defaults
+            scrapeInterval: 30s        # Dev: 30s tiết kiệm. Prod: 15s
+            evaluationInterval: 30s
+
+        # ─── Alertmanager ──────────────────────────
+        # Sẽ config chi tiết ở Lesson 7.5
+        alertmanager:
+          enabled: true
+          alertmanagerSpec:
+            storage:
+              volumeClaimTemplate:
+                spec:
+                  storageClassName: gp3
+                  accessModes: ["ReadWriteOnce"]
+                  resources:
+                    requests:
+                      storage: 2Gi
+
+        # ─── Grafana ───────────────────────────────
+        # Sẽ config chi tiết ở Lesson 7.3
+        grafana:
+          enabled: true
+          adminPassword: ""        # ⚠️ Sẽ thay bằng ExternalSecret
+          persistence:
+            enabled: true
+            storageClassName: gp3
+            size: 2Gi
+          # Ingress sẽ thêm sau qua ALB
+
+        # ─── kube-state-metrics ────────────────────
+        kube-state-metrics:
+          enabled: true
+
+        # ─── node-exporter ─────────────────────────
+        nodeExporter:
+          enabled: true
+
+        # ─── prometheus-operator ───────────────────
+        prometheusOperator:
+          enabled: true
+          # Admission webhook đôi khi gây vấn đề khi ArgoCD sync
+          admissionWebhooks:
+            patch:
+              enabled: true
+
+        # ─── Default rules ─────────────────────────
+        # Tắt 1 vài rule không cần cho dev
+        defaultRules:
+          create: true
+          rules:
+            etcd: false              # EKS managed → không expose etcd
+            kubeApiserverAvailability: true
+            kubeControllerManager: false   # EKS managed
+            kubeScheduler: false           # EKS managed
+            kubeProxy: false
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - SkipDryRunOnMissingResource=true   # CRDs install lần đầu
+      - PruneLast=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
