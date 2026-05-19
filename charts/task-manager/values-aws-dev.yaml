@@ -15,7 +15,7 @@ backend:
   replicaCount: 2
   image:
     repository: doanvantai/nt548-backend
-    tag: "ec76318" # CI sẽ update
+    tag: "7691d7c" # CI sẽ update
   config:
     LOG_LEVEL: info
     # ⚠️ Update theo RDS endpoint thực tế:
