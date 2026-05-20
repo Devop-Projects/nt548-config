@@ -132,5 +132,5 @@ spec:
       limit: 5
       backoff:
         duration: 30s
-        factor: 2
+        factor: 2 
         maxDuration: 5m

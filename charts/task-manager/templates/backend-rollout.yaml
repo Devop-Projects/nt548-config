@@ -28,40 +28,38 @@ spec:
 
   # ─── STRATEGY ───
   strategy:
-    {{- if eq .Values.backend.rollout.strategy "blueGreen" }}
-    blueGreen:
-      activeService: {{ .Values.backend.rollout.blueGreen.activeService }}
-      previewService: {{ .Values.backend.rollout.blueGreen.previewService }}
+      {{- if eq .Values.backend.rollout.strategy "blueGreen" }}
+  blueGreen:
+    activeService: {{ .Values.backend.rollout.blueGreen.activeService }}
+    previewService: {{ .Values.backend.rollout.blueGreen.previewService }}
+    autoPromotionEnabled: {{ .Values.backend.rollout.blueGreen.autoPromotionEnabled }}
+    scaleDownDelaySeconds: {{ .Values.backend.rollout.blueGreen.scaleDownDelaySeconds }}
 
-      autoPromotionEnabled: {{ .Values.backend.rollout.blueGreen.autoPromotionEnabled }}
-      {{- with .Values.backend.rollout.blueGreen.autoPromotionSeconds }}
-      autoPromotionSeconds: {{ . }}
-      {{- end }}
-
-      scaleDownDelaySeconds: {{ .Values.backend.rollout.blueGreen.scaleDownDelaySeconds }}
-
-      {{- if .Values.backend.rollout.blueGreen.prePromotionAnalysis.enabled }}
-      prePromotionAnalysis:
-        templates:
-          {{- range .Values.backend.rollout.blueGreen.prePromotionAnalysis.templates }}
-          - templateName: {{ . }}
-          {{- end }}
-        args:
-          - name: service-name
-            value: {{ .Values.backend.rollout.blueGreen.previewService }}
-      {{- end }}
-
-      {{- if .Values.backend.rollout.blueGreen.postPromotionAnalysis.enabled }}
-      postPromotionAnalysis:
-        templates:
-          {{- range .Values.backend.rollout.blueGreen.postPromotionAnalysis.templates }}
-          - templateName: {{ . }}
-          {{- end }}
-        args:
-          - name: service-name
-            value: {{ .Values.backend.rollout.blueGreen.activeService }}
-      {{- end }}
+    # ⭐ Block prePromotionAnalysis
+    {{- if .Values.backend.rollout.blueGreen.prePromotionAnalysis.enabled }}
+    prePromotionAnalysis:
+      templates:
+        {{- range .Values.backend.rollout.blueGreen.prePromotionAnalysis.templates }}
+        - templateName: {{ . }}
+        {{- end }}
+      # ⭐ ARGS — đây là chỗ Rollout truyền service name cho AnalysisTemplate
+      args:
+        - name: service-name
+          value: {{ .Values.backend.rollout.blueGreen.previewService }}
     {{- end }}
+
+    # postPromotionAnalysis — tương tự
+    {{- if .Values.backend.rollout.blueGreen.postPromotionAnalysis.enabled }}
+    postPromotionAnalysis:
+      templates:
+        {{- range .Values.backend.rollout.blueGreen.postPromotionAnalysis.templates }}
+        - templateName: {{ . }}
+        {{- end }}
+      args:
+        - name: service-name
+          value: {{ .Values.backend.rollout.blueGreen.activeService }}
+    {{- end }}
+  {{- end }}
 
     {{- if eq .Values.backend.rollout.strategy "canary" }}
     canary:

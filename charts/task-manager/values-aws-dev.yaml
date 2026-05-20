@@ -12,7 +12,7 @@ namespace:
   create: true
   name: task-manager-dev
 backend:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: doanvantai/nt548-backend
     tag: "ec76318" # CI sẽ update
@@ -50,7 +50,7 @@ backend:
         enabled: false
         templates: []
 frontend:
-  replicaCount: 2
+  replicaCount: 1
   image:
     repository: doanvantai/nt548-frontend
     tag: "ec76318"

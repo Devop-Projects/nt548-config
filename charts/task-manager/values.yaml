@@ -39,7 +39,10 @@ namespace:
     enforce: ""           # Để trống = không enforce (audit only)
     audit: restricted
     warn: restricted
-
+monitoring:
+  enabled: false
+  scrapeInterval: 30s
+  
 # ════════════════════════════════════════════════════════════════
 # RBAC & SERVICE ACCOUNTS
 # ════════════════════════════════════════════════════════════════

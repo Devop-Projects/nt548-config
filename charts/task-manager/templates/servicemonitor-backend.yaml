@@ -1,0 +1,28 @@
+{{- if and .Values.backend.enabled .Values.monitoring.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "task-manager.backend.fullname" . }}-metrics
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+    # ⚠️ Label này QUAN TRỌNG — Prometheus instance lookup theo label
+    # kube-prometheus-stack mặc định: release=kube-prometheus-stack
+    release: kube-prometheus-stack
+spec:
+  selector:
+    matchLabels:
+      {{- include "task-manager.backend.selectorLabels" . | nindent 6 }}
+  endpoints:
+  - port: http                    # named port trong Service
+    path: /metrics
+    interval: {{ .Values.monitoring.scrapeInterval | default "30s" }}
+    scrapeTimeout: 10s
+    # Tránh scrape Trừ khi pod ready
+    honorLabels: false
+    # Loại bỏ labels có thể gây cardinality
+    metricRelabelings:
+    - sourceLabels: [__name__]
+      regex: 'go_.*'   # Loại metrics go_* không cần (prom-client emit chúng nhưng app là Node.js, không Go)
+      action: drop
+{{- end }}
