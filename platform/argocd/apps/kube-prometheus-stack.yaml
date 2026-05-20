@@ -80,7 +80,7 @@ spec:
         # Sẽ config chi tiết ở Lesson 7.3
         grafana:
           enabled: true
-          adminPassword: ""        # ⚠️ Sẽ thay bằng ExternalSecret
+          adminPassword: "admin123"        # ⚠️ Sẽ thay bằng ExternalSecret
           persistence:
             enabled: true
             storageClassName: gp3
