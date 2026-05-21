@@ -12,7 +12,11 @@ metadata:
 spec:
   selector:
     matchLabels:
-      {{- include "task-manager.backend.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: {{ include "task-manager.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: backend
+      # ⚠️ KHÔNG include "app: backend" vì Service.metadata.labels không có
+      # (helper backend.labels không emit nó, chỉ selectorLabels mới có)
   endpoints:
   - port: http                    # named port trong Service
     path: /metrics
