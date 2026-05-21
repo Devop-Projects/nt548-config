@@ -1,0 +1,50 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: backend-red-rules
+  namespace: monitoring
+  labels:
+    release: kube-prometheus-stack
+spec:
+  groups:
+  - name: backend.red.rules
+    interval: 30s
+    rules:
+    # Rate
+    - record: backend:http_requests:rate5m
+      expr: |
+        sum by (route, method) (
+          rate(http_requests_total{app="backend"}[5m])
+        )
+
+    # Errors %
+    - record: backend:http_errors:ratio5m
+      expr: |
+        sum(rate(http_requests_total{app="backend",status_code=~"5.."}[5m]))
+        /
+        clamp_min(sum(rate(http_requests_total{app="backend"}[5m])), 0.001)
+
+    # p50/p95/p99 duration
+    - record: backend:http_duration:p50
+      expr: |
+        histogram_quantile(0.50,
+          sum by (le, route) (
+            rate(http_request_duration_seconds_bucket{app="backend"}[5m])
+          )
+        )
+
+    - record: backend:http_duration:p95
+      expr: |
+        histogram_quantile(0.95,
+          sum by (le, route) (
+            rate(http_request_duration_seconds_bucket{app="backend"}[5m])
+          )
+        )
+
+    - record: backend:http_duration:p99
+      expr: |
+        histogram_quantile(0.99,
+          sum by (le, route) (
+            rate(http_request_duration_seconds_bucket{app="backend"}[5m])
+          )
+        )

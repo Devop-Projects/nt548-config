@@ -1,0 +1,51 @@
+{
+  "title": "Backend — RED Method",
+  "uid": "backend-red",
+  "tags": ["backend", "red", "task-manager"],
+  "refresh": "30s",
+  "time": { "from": "now-1h", "to": "now" },
+
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "type": "datasource",
+        "query": "prometheus"
+      },
+      {
+        "name": "namespace",
+        "type": "query",
+        "datasource": "$datasource",
+        "query": "label_values(http_requests_total, namespace)",
+        "current": { "value": "task-manager-dev" }
+      },
+      {
+        "name": "route",
+        "type": "query",
+        "datasource": "$datasource",
+        "query": "label_values(http_requests_total{namespace=\"$namespace\"}, route)",
+        "includeAll": true,
+        "multi": true,
+        "current": { "value": "$__all" }
+      }
+    ]
+  },
+
+  "panels": [
+    /* Row 1: Health at a glance */
+    { /* Stat: Total req/s */ },
+    { /* Stat: Error rate % */ },
+    { /* Stat: p95 latency */ },
+    { /* Stat: Active pods */ },
+
+    /* Row 2: RED time series */
+    { /* Time series: rate by route */ },
+    { /* Time series: errors by status */ },
+    { /* Time series: latency percentiles */ },
+    { /* Heatmap: latency distribution */ },
+
+    /* Row 3: Saturation */
+    { /* Gauge: DB pool */ },
+    { /* Time series: Pod CPU/Mem */ }
+  ]
+}
