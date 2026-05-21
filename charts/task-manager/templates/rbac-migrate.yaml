@@ -1,0 +1,51 @@
+{{/*
+═══════════════════════════════════════════════════════════════════
+templates/rbac-migrate.yaml
+
+RBAC cho migrate Job initContainer để check Secret tồn tại.
+
+WHY THIS FILE EXISTS:
+- migrate Job có initContainer 'wait-for-db-credentials' dùng kubectl
+- kubectl cần permission GET trên Secret resource
+- ServiceAccount backend-sa mặc định không có quyền này
+- → Tạo Role + RoleBinding minimal (least-privilege)
+
+WHY resourceNames whitelist:
+- Chỉ cấp quyền đọc Secret tên 'db-credentials' (cụ thể)
+- KHÔNG wide-open quyền đọc mọi Secret trong namespace
+- Phòng compromise: nếu pod bị hack, attacker không scan được mọi secrets
+═══════════════════════════════════════════════════════════════════
+*/}}
+{{- if and .Values.migration.enabled .Values.backend.externalSecret.enabled -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "task-manager.fullname" . }}-migrate-reader
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+rules:
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+    # ⭐ Least-privilege: chỉ secret cụ thể
+    resourceNames: ["db-credentials"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "task-manager.fullname" . }}-migrate-reader
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migration
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceAccounts.backend.name }}
+    namespace: {{ .Values.namespace.name }}
+roleRef:
+  kind: Role
+  name: {{ include "task-manager.fullname" . }}-migrate-reader
+  apiGroup: rbac.authorization.k8s.io
+{{- end }}

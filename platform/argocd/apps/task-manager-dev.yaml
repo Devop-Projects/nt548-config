@@ -1,7 +1,7 @@
 # platform/argocd/apps/task-manager-dev.yaml
 #
 # ArgoCD Application using Helm chart.
-# Migrated from Kustomize on $(date +%Y-%m-%d).
+# Version 2: Fixed dependency hell with proper ignoreDifferences + retry logic.
 
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -16,51 +16,24 @@ spec:
   source:
     repoURL: https://github.com/Devop-Projects/nt548-config.git
     targetRevision: main
-    # ⭐ Trỏ vào folder chứa Chart.yaml (không phải overlay nữa)
     path: charts/task-manager
-
-    # ⭐ Helm-specific config
     helm:
       releaseName: task-manager
       valueFiles:
-        - values.yaml             # Base defaults
-        - values-aws-dev.yaml     # Environment overrides
-
-      # Optional: override values inline (use sparingly)
-      # parameters:
-      #   - name: backend.image.tag
-      #     value: "abc123"
+        - values.yaml
+        - values-aws-dev.yaml
 
   destination:
     server: https://kubernetes.default.svc
     namespace: task-manager-dev
 
-  syncPolicy:
-    automated:
-      prune: true
-      selfHeal: true
-      allowEmpty: false
-    syncOptions:
-      - CreateNamespace=true
-      - ServerSideApply=true
-      - PruneLast=true
-      # Helm hooks → ArgoCD PreSync/PostSync
-      # ArgoCD tự handle, không cần option đặc biệt
-    retry:
-      limit: 5
-      backoff:
-        duration: 5s
-        factor: 2
-        maxDuration: 3m
-
-  revisionHistoryLimit: 10
-
+  # ⭐ ignoreDifferences: tránh false-positive drift detection
   ignoreDifferences:
+    # K8s injects pod-template-hash, controller-uid sau khi tạo
     - group: apps
       kind: Deployment
       jsonPointers:
         - /spec/replicas
-    
     - group: ""
       kind: Service
       jqPathExpressions:
@@ -75,4 +48,35 @@ spec:
         - '.spec.data[].remoteRef.conversionStrategy'
         - '.spec.data[].remoteRef.decodingStrategy'
         - '.spec.data[].remoteRef.metadataPolicy'
-  
+    # ⭐ Job: K8s auto-add controller-uid label sau khi tạo → drift false-positive
+    - group: batch
+      kind: Job
+      jqPathExpressions:
+        - '.spec.template.metadata.labels["controller-uid"]'
+        - '.spec.template.metadata.labels["batch.kubernetes.io/controller-uid"]'
+        - '.spec.template.metadata.labels["job-name"]'
+        - '.spec.template.metadata.labels["batch.kubernetes.io/job-name"]'
+        - '.spec.selector.matchLabels["controller-uid"]'
+        - '.spec.selector.matchLabels["batch.kubernetes.io/controller-uid"]'
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - PruneLast=true
+      - ApplyOutOfSyncOnly=true
+      - RespectIgnoreDifferences=true
+    # ⭐ Retry generous hơn: 5 attempts với exponential backoff
+    # Lần đầu deploy có thể fail vì ESO chưa sync xong → ArgoCD tự retry
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+
+  revisionHistoryLimit: 10
