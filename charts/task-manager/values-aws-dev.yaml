@@ -11,6 +11,11 @@ global:
 namespace:
   create: true
   name: task-manager-dev
+  
+monitoring:
+  enabled: true
+  scrapeInterval: 30s
+
 backend:
   replicaCount: 1
   image:
