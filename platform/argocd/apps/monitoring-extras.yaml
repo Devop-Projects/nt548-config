@@ -1,0 +1,64 @@
+# platform/argocd/apps/monitoring-extras.yaml
+#
+# ArgoCD Application quản lý các resource phụ trợ cho monitoring stack:
+# - StorageClass gp3 (cho Prometheus + Grafana + Alertmanager PVCs)
+# - ExternalSecret grafana-admin-secret (sync AWS Secrets Manager → K8s)
+# - (Sau này: PrometheusRule cho recording rules + alerts)
+#
+# ⚠️ DEPENDENCY: Application này PHẢI sync TRƯỚC kube-prometheus-stack
+# vì KPS reference cả StorageClass và Secret.
+#
+# Cách enforce thứ tự: sync wave (annotation argocd.argoproj.io/sync-wave)
+# - wave "-10" = sync sớm nhất
+# - kube-prometheus-stack có wave default "0"
+# → ArgoCD sync wave thấp trước.
+
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring-extras
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # Sync sớm hơn các Application khác trong cùng tier
+    argocd.argoproj.io/sync-wave: "-10"
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/Devop-Projects/nt548-config.git
+    targetRevision: main
+    path: platform/monitoring
+    directory:
+      recurse: false
+      # Chỉ pick yaml file, bỏ qua README hay file khác
+      include: '*.yaml'
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+
+  # ignoreDifferences cho ExternalSecret:
+  # ESO auto-add field conversionStrategy → ArgoCD nghĩ là drift
+  ignoreDifferences:
+    - group: external-secrets.io
+      kind: ExternalSecret
+      jqPathExpressions:
+        - '.spec.data[].remoteRef.conversionStrategy'
+        - '.spec.data[].remoteRef.decodingStrategy'
+        - '.spec.data[].remoteRef.metadataPolicy'
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m

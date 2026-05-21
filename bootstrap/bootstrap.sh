@@ -164,6 +164,7 @@ fi
 # ─── TIER 1: Monitoring + Tools ──────────────────────
 if [ -z "$TIER_FILTER" ] || [ "$TIER_FILTER" = "1" ]; then
   apply_tier 1 \
+    "monitoring-extras.yaml" \
     "kube-prometheus-stack.yaml" \
     "argo-rollouts.yaml"
 fi

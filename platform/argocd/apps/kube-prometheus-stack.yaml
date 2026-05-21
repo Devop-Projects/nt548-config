@@ -5,6 +5,9 @@ metadata:
   namespace: argocd
   finalizers:
     - resources-finalizer.argocd.argoproj.io
+  annotations:
+    # ⚠️ Sync SAU monitoring-extras (-10) vì cần StorageClass + Secret
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
 
