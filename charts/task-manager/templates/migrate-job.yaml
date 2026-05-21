@@ -39,11 +39,6 @@ metadata:
     {{- include "task-manager.labels" . | nindent 4 }}
     app: db-migrate
     app.kubernetes.io/component: migration
-  annotations:
-    # KHÔNG dùng Helm hook nữa — gây race condition với ExternalSecret
-    # ArgoCD-aware: hook PreSync chỉ apply khi cần
-    argocd.argoproj.io/hook: PreSync
-    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation
 spec:
   backoffLimit: {{ .Values.migration.backoffLimit }}
   ttlSecondsAfterFinished: {{ .Values.migration.ttlSecondsAfterFinished }}
