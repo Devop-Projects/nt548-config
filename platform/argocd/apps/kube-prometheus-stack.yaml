@@ -101,7 +101,7 @@ spec:
               alb.ingress.kubernetes.io/scheme: internet-facing
               alb.ingress.kubernetes.io/target-type: ip
               alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-              alb.ingress.kubernetes.io/certificate-arn: "__ACM_CERT_ARN__"
+              alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/63f16178-0194-4771-b1fc-9f10802a6dc7"
               alb.ingress.kubernetes.io/ssl-redirect: '443'
               alb.ingress.kubernetes.io/healthcheck-path: /api/health
               alb.ingress.kubernetes.io/group.name: monitoring
