@@ -3,21 +3,25 @@ kind: Kustomization
 
 namespace: monitoring
 
-# Apply label to MỌI resource
+# ⭐ MAGIC LABEL — Grafana sidecar scan ConfigMap có label này
+# Match với config sidecar.dashboards.label trong kube-prometheus-stack values
 labels:
-- pairs:
-    grafana_dashboard: "1"      # ⭐ Magic label cho sidecar
-  includeSelectors: false
+  - pairs:
+      grafana_dashboard: "1"
+    includeSelectors: false
 
-# Common annotations
 commonAnnotations:
   managed-by: gitops
+  thesis.author: vantai-NT548
 
-# Configmap generator từ JSON files
+# ⭐ ConfigMap generator từ JSON file
+# Kustomize tự đọc file → tạo ConfigMap với content là file content
 configMapGenerator:
-- name: backend-red-dashboard
-  files:
-  - backend-red.json
-- name: node-use-dashboard
-  files:
-  - node-use.json
+  - name: backend-red-dashboard
+    files:
+      - backend-red.json
+
+generatorOptions:
+  # Hash suffix: khi JSON đổi → name đổi (vd: backend-red-dashboard-h7f2k9)
+  # → Grafana sidecar thấy "ConfigMap mới" → reload dashboard
+  disableNameSuffixHash: false
