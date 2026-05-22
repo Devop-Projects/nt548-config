@@ -10,7 +10,6 @@ metadata:
     argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
-
   # CRDs to ignore (Helm + Operator hay tạo lệch diff)
   ignoreDifferences:
     - group: apiextensions.k8s.io
@@ -21,11 +20,10 @@ spec:
       kind: ValidatingWebhookConfiguration
       jqPathExpressions:
         - '.webhooks[]?.clientConfig.caBundle'
-
   source:
     repoURL: https://prometheus-community.github.io/helm-charts
     chart: kube-prometheus-stack
-    targetRevision: 62.7.0     # ⚠️ pin version cho reproducibility
+    targetRevision: 62.7.0 # ⚠️ pin version cho reproducibility
     helm:
       releaseName: kube-prometheus-stack
       values: |
@@ -35,13 +33,11 @@ spec:
             # Retention: 15 ngày cho dev (tradeoff storage/history)
             retention: 15d
             retentionSize: "8GB"
-
             # Discover ServiceMonitor từ tất cả namespace
             # Mặc định nó CHỈ match release label → false sẽ catch mọi SM
             serviceMonitorSelectorNilUsesHelmValues: false
             podMonitorSelectorNilUsesHelmValues: false
             ruleSelectorNilUsesHelmValues: false
-
             # Storage
             storageSpec:
               volumeClaimTemplate:
@@ -51,7 +47,6 @@ spec:
                   resources:
                     requests:
                       storage: 10Gi
-
             # Resources
             resources:
               requests:
@@ -60,11 +55,9 @@ spec:
               limits:
                 cpu: 1000m
                 memory: 2Gi
-
             # Scrape config defaults
-            scrapeInterval: 30s        # Dev: 30s tiết kiệm. Prod: 15s
+            scrapeInterval: 30s # Dev: 30s tiết kiệm. Prod: 15s
             evaluationInterval: 30s
-
         # ─── Alertmanager ──────────────────────────
         # Sẽ config chi tiết ở Lesson 7.5
         alertmanager:
@@ -78,24 +71,20 @@ spec:
                   resources:
                     requests:
                       storage: 2Gi
-
         # ─── Grafana ───────────────────────────────
         # Sẽ config chi tiết ở Lesson 7.3
         grafana:
           enabled: true
-
           # ─── Admin credentials từ ExternalSecret ────────
           admin:
             existingSecret: grafana-admin-secret
             userKey: admin-user
             passwordKey: admin-password
-
           # ─── Persistence ────────────────────────────────
           persistence:
             enabled: true
             storageClassName: gp3
             size: 2Gi
-
           # ─── Ingress qua ALB ────────────────────────────
           ingress:
             enabled: true
@@ -104,7 +93,7 @@ spec:
               alb.ingress.kubernetes.io/scheme: internet-facing
               alb.ingress.kubernetes.io/target-type: ip
               alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
-              alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/63f16178-0194-4771-b1fc-9f10802a6dc7"
+              alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/6230ce58-4cce-4dba-8a03-ef63edec3dad"
               alb.ingress.kubernetes.io/ssl-redirect: '443'
               alb.ingress.kubernetes.io/healthcheck-path: /api/health
               alb.ingress.kubernetes.io/group.name: monitoring
@@ -112,7 +101,6 @@ spec:
               - grafana.vantai.click
             paths:
               - /
-
           # ─── Grafana config ─────────────────────────────
           grafana.ini:
             server:
@@ -124,14 +112,13 @@ spec:
               cookie_secure: true
               cookie_samesite: lax
               disable_gravatar: true
-
           # ─── Sidecar config (CRITICAL cho dashboard-as-code) ────
           sidecar:
             dashboards:
               enabled: true
               label: grafana_dashboard
               labelValue: "1"
-              searchNamespace: ALL    # scan TẤT CẢ namespaces
+              searchNamespace: ALL # scan TẤT CẢ namespaces
               folder: /tmp/dashboards
               provider:
                 foldersFromFilesStructure: false
@@ -139,15 +126,12 @@ spec:
               enabled: true
               label: grafana_datasource
               labelValue: "1"
-
         # ─── kube-state-metrics ────────────────────
         kube-state-metrics:
           enabled: true
-
         # ─── node-exporter ─────────────────────────
         nodeExporter:
           enabled: true
-
         # ─── prometheus-operator ───────────────────
         prometheusOperator:
           enabled: true
@@ -155,22 +139,19 @@ spec:
           admissionWebhooks:
             patch:
               enabled: true
-
         # ─── Default rules ─────────────────────────
         # Tắt 1 vài rule không cần cho dev
         defaultRules:
           create: true
           rules:
-            etcd: false              # EKS managed → không expose etcd
+            etcd: false # EKS managed → không expose etcd
             kubeApiserverAvailability: true
-            kubeControllerManager: false   # EKS managed
-            kubeScheduler: false           # EKS managed
+            kubeControllerManager: false # EKS managed
+            kubeScheduler: false # EKS managed
             kubeProxy: false
-
   destination:
     server: https://kubernetes.default.svc
     namespace: monitoring
-
   syncPolicy:
     automated:
       prune: true
@@ -179,11 +160,11 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
-      - SkipDryRunOnMissingResource=true   # CRDs install lần đầu
+      - SkipDryRunOnMissingResource=true # CRDs install lần đầu
       - PruneLast=true
     retry:
       limit: 5
       backoff:
         duration: 30s
-        factor: 2 
+        factor: 2
         maxDuration: 5m
