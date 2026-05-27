@@ -34,7 +34,7 @@ backend:
     secretStoreName: aws-secrets-manager
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
-    dbSecretName: "rds!db-e5358cf0-85c8-4b3b-a383-2c53c4a00793"
+    dbSecretName: "rds!db-c107df21-2492-472d-b750-70dd28e36701"
   rollout:
     enabled: true
     strategy: blueGreen
@@ -65,7 +65,7 @@ ingress:
   className: alb
   alb:
     # ⚠️ Update theo ACM cert thực tế:
-    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/863ecc4c-2270-4d4a-a590-fad16c44bf9a"
+    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/f3a0c76f-bc1f-4f81-ae36-ec977c7aa679"
     healthcheckPath: /health/ready
   hosts:
     - host: task-manager.vantai.click
