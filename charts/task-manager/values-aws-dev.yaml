@@ -18,7 +18,7 @@ backend:
   replicaCount: 1
   image:
     repository: doanvantai/nt548-backend
-    tag: "f01c711" # CI sẽ update
+    tag: "fa406e6" # CI sẽ update
   config:
     LOG_LEVEL: info
     # ⚠️ Update theo RDS endpoint thực tế:
@@ -34,7 +34,8 @@ backend:
     secretStoreName: aws-secrets-manager
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
-    dbSecretName: "arn:aws:secretsmanager:ap-southeast-1:113008551898:secret:rds!db-6808c4a4-b190-4926-a1a1-13cc24eaf113-V0YtpW"
+    dbSecretName: "rds!db-d76f262b-92b4-4c06-9251-3e41630b5b7b"
+  rollout:
     enabled: true
     strategy: blueGreen
     analysisTemplates:
@@ -55,7 +56,7 @@ frontend:
   replicaCount: 1
   image:
     repository: doanvantai/nt548-frontend
-    tag: "f01c711"
+    tag: "fa406e6"
 # Tắt postgres in-cluster (dùng RDS thay)
 postgres:
   enabled: false
@@ -64,7 +65,7 @@ ingress:
   className: alb
   alb:
     # ⚠️ Update theo ACM cert thực tế:
-    certificateArn: "arn:aws:acm:ap-southeast-1:113008551898:certificate/2d03a8f9-cc9e-4c9e-8532-d9ba426154ac"
+    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/6230ce58-4cce-4dba-8a03-ef63edec3dad"
     healthcheckPath: /health/ready
   hosts:
     - host: task-manager.vantai.click
