@@ -66,7 +66,7 @@ ingress:
   alb:
     # ⚠️ Update theo ACM cert thực tế:
     certificateArn: "arn:aws:acm:ap-southeast-1:113008551898:certificate/2d03a8f9-cc9e-4c9e-8532-d9ba426154ac"
-    healthcheckPath: /health/ready
+    healthcheckPath: /api/health/ready
   hosts:
     - host: task-manager.vantai.click
       paths:
