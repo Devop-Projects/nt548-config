@@ -34,8 +34,7 @@ backend:
     secretStoreName: aws-secrets-manager
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
-    dbSecretName: "rds!db-6808c4a4-b190-4926-a1a1-13cc24eaf113"
-  rollout:
+    dbSecretName: "arn:aws:secretsmanager:ap-southeast-1:113008551898:secret:rds!db-6808c4a4-b190-4926-a1a1-13cc24eaf113-V0YtpW"
     enabled: true
     strategy: blueGreen
     analysisTemplates:
