@@ -68,7 +68,7 @@ ingress:
     certificateArn: "arn:aws:acm:ap-southeast-1:113008551898:certificate/2d03a8f9-cc9e-4c9e-8532-d9ba426154ac"
     healthcheckPath: /api/health/ready
   hosts:
-    - host: task-manager.vantai.click
+    - host: task-manager.cookial.site
       paths:
         - path: /api
           pathType: Prefix
