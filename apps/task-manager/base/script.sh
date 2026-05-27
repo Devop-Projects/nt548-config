@@ -1,91 +1,98 @@
- Step 6: Tạo Secrets trong namespace mới
-⚠️ CỰC KỲ QUAN TRỌNG: Theo plan của bạn, bạn đang tạo Secret với DATABASE_URL=postgres://taskuser:password@... - đây là password sai (không khớp postgres-secrets)! Đừng làm như plan, làm theo cách dưới đây:
-bashcd ~/NT548-DevOps
+#!/usr/bin/env bash
+set -euo pipefail
 
-# === Postgres Secret ===
-kubectl create secret generic postgres-secrets -n task-manager-dev \
-  --from-literal=POSTGRES_PASSWORD='taskpassword-strong'
+NAMESPACE="${NAMESPACE:-task-manager-dev}"
+POSTGRES_PASSWORD="${POSTGRES_PASSWORD:-taskpassword-strong}"
+BASE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# === Backend Secret (CHỈ JWT_SECRET, KHÔNG có DATABASE_URL!) ===
-# Vì code mới của bạn (database.js) build URL từ components
-JWT_SECRET=$(openssl rand -base64 32)
-kubectl create secret generic backend-secrets -n task-manager-dev \
-  --from-literal=JWT_SECRET="$JWT_SECRET"
+log() {
+  printf '\n==> %s\n' "$1"
+}
 
-# Verify
-kubectl get secrets -n task-manager-dev
-# Expect:
-# NAME               TYPE     DATA   AGE
-# backend-secrets    Opaque   1      Xs   ← Chỉ 1 key (JWT_SECRET)
-# postgres-secrets   Opaque   1      Xs   ← Chỉ 1 key (POSTGRES_PASSWORD)
+run() {
+  printf '+'
+  printf ' %q' "$@"
+  printf '\n'
+  "$@"
+}
 
-kubectl describe secret backend-secrets -n task-manager-dev
-# Phải thấy: JWT_SECRET: <bytes>
-# KHÔNG có DATABASE_URL
-🔧 Step 7: Deploy theo Đúng Thứ tự (Dependency Order)
-bashcd ~/NT548-DevOps
+require_tools() {
+  command -v kubectl >/dev/null 2>&1 || {
+    echo "kubectl was not found in PATH." >&2
+    exit 1
+  }
 
-# 1. Postgres FIRST (backend depends on it)
-kubectl apply -f k8s/base/postgres-statefulset.yaml
+  command -v openssl >/dev/null 2>&1 || {
+    echo "openssl was not found in PATH." >&2
+    exit 1
+  }
+}
 
-# Đợi postgres ready (quan trọng!)
-kubectl wait --for=condition=Ready pod/postgres-0 -n task-manager-dev --timeout=180s
+ensure_secret() {
+  local secret_name="$1"
+  shift
 
-# 2. Verify postgres OK
-kubectl exec postgres-0 -n task-manager-dev -- \
-  pg_isready -U taskuser
-# Expect: "accepting connections"
+  if kubectl get secret "$secret_name" -n "$NAMESPACE" >/dev/null 2>&1; then
+    echo "Secret $secret_name already exists; keeping current value."
+    return
+  fi
 
-# 3. Backend ConfigMap (must exist before Deployment)
-kubectl apply -f k8s/base/backend-configmap.yaml
+  run kubectl create secret generic "$secret_name" -n "$NAMESPACE" "$@"
+}
 
-# 4. Run migration FIRST (creates tables)
-kubectl apply -f k8s/base/migrate-job.yaml
+require_tools
 
-# Đợi migration xong
-kubectl wait --for=condition=Complete job/db-migrate -n task-manager-dev --timeout=120s
+log "Using Kubernetes context"
+run kubectl config current-context
 
-# Check log
-kubectl logs -l app=db-migrate -n task-manager-dev
-# Expect: "Migration completed successfully"
+log "Apply namespace"
+run kubectl apply -f "$BASE_DIR/namespace.yaml"
 
-# Verify tables
-kubectl exec postgres-0 -n task-manager-dev -- \
-  psql -U taskuser -d taskdb -c "\dt"
-# Expect: thấy bảng "users" và "tasks"
+log "Clean old stateless workloads from previous dev runs"
+run kubectl delete deployment backend frontend -n "$NAMESPACE" --ignore-not-found=true
+run kubectl delete job db-migrate -n "$NAMESPACE" --ignore-not-found=true
 
-# 5. Backend Deployment
-kubectl apply -f k8s/base/backend-deployment.yaml
+log "Apply namespace policies and service accounts"
+run kubectl apply -f "$BASE_DIR/resourcequota.yaml"
+run kubectl apply -f "$BASE_DIR/limitrange.yaml"
+run kubectl apply -f "$BASE_DIR/rbac.yaml"
 
-# Đợi rollout
-kubectl rollout status deployment/backend -n task-manager-dev --timeout=180s
+log "Create required secrets if missing"
+ensure_secret postgres-secrets \
+  --from-literal="POSTGRES_PASSWORD=$POSTGRES_PASSWORD"
 
-# 6. Frontend
-kubectl apply -f k8s/base/frontend-deployment.yaml
-kubectl rollout status deployment/frontend -n task-manager-dev --timeout=120s
+JWT_SECRET="$(openssl rand -base64 32)"
+ensure_secret backend-secrets \
+  --from-literal="JWT_SECRET=$JWT_SECRET"
 
-# 7. Ingress
-kubectl apply -f k8s/base/ingress.yaml
+log "Deploy Postgres"
+run kubectl apply -f "$BASE_DIR/postgres-services.yaml"
+run kubectl apply -f "$BASE_DIR/postgres-statefulset.yaml"
+run kubectl wait --for=condition=Ready pod/postgres-0 -n "$NAMESPACE" --timeout=180s
+run kubectl exec postgres-0 -n "$NAMESPACE" -- pg_isready -U taskuser -d taskdb
 
-# 8. Final check
-kubectl get all -n task-manager-dev
-🔧 Step 8: End-to-End Test
-bash# Đợi vài giây cho Ingress propagate
-sleep 5
+log "Deploy backend config, service, and migration job"
+run kubectl apply -f "$BASE_DIR/backend-configmap.yaml"
+run kubectl apply -f "$BASE_DIR/backend-service.yaml"
+run kubectl delete job db-migrate -n "$NAMESPACE" --ignore-not-found=true
+run kubectl apply -f "$BASE_DIR/migrate-job.yaml"
+run kubectl wait --for=condition=Complete job/db-migrate -n "$NAMESPACE" --timeout=180s
 
-# Health check
-curl -s http://taskmanager.local:8081/api/health/ready | jq .
-# Expect: {"status":"ready","dependencies":{"database":"ok"}}
+log "Deploy backend"
+run kubectl apply -f "$BASE_DIR/backend-deployment.yaml"
+run kubectl rollout status deployment/backend -n "$NAMESPACE" --timeout=180s
 
-# Register
-curl -X POST http://taskmanager.local:8081/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"username":"vantai","email":"vantai@thesis.com","password":"secure123"}' | jq .
-# Expect: {"token":"...","user":{...}}
+log "Deploy frontend"
+run kubectl apply -f "$BASE_DIR/frontend-service.yaml"
+run kubectl apply -f "$BASE_DIR/frontend-deployment.yaml"
+run kubectl rollout status deployment/frontend -n "$NAMESPACE" --timeout=180s
 
-# Login
-curl -X POST http://taskmanager.local:8081/api/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{"email":"vantai@thesis.com","password":"secure123"}' | jq .
+log "Apply ingress and network policies"
+run kubectl apply -f "$BASE_DIR/ingress.yaml"
+run kubectl apply -f "$BASE_DIR/network-policies.yaml"
 
-echo "🎉 Full E2E test PASSED!"
+log "Final status"
+run kubectl get all -n "$NAMESPACE" -o wide
+run kubectl get ingress,networkpolicy -n "$NAMESPACE"
+
+log "Done"
