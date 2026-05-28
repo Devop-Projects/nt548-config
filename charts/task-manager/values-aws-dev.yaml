@@ -22,7 +22,7 @@ backend:
   config:
     LOG_LEVEL: info
     # ⚠️ Update theo RDS endpoint thực tế:
-    DB_HOST: "devops-dev-db.cbc6a8s4awde.ap-southeast-1.rds.amazonaws.com"
+    DB_HOST: "devops-dev-db.chi0awig8v33.ap-southeast-1.rds.amazonaws.com"
     DB_PORT: "5432"
     DB_NAME: "appdb"
     DB_USER: "appuser"
@@ -34,7 +34,7 @@ backend:
     secretStoreName: aws-secrets-manager
     awsSecretName: "devops/dev/backend/secrets"
     # ⚠️ Update theo RDS secret thực tế:
-    dbSecretName: "arn:aws:secretsmanager:ap-southeast-1:113008551898:secret:rds!db-6808c4a4-b190-4926-a1a1-13cc24eaf113-V0YtpW"
+    dbSecretName: "rds!db-aa277852-282d-43b0-b38c-f468c174b8e3"
   rollout:
     enabled: true
     strategy: blueGreen
@@ -65,7 +65,7 @@ ingress:
   className: alb
   alb:
     # ⚠️ Update theo ACM cert thực tế:
-    certificateArn: "arn:aws:acm:ap-southeast-1:113008551898:certificate/2d03a8f9-cc9e-4c9e-8532-d9ba426154ac"
+    certificateArn: "arn:aws:acm:ap-southeast-1:954692413669:certificate/b5ac434b-0c7c-405c-9ac1-a466cad748e0"
     healthcheckPath: /api/health/ready
   hosts:
     - host: www.cookial.site
