@@ -85,6 +85,8 @@ spec:
             enabled: true
             storageClassName: gp3
             size: 2Gi
+          deploymentStrategy:
+            type: Recreate
           # ─── Ingress qua ALB ────────────────────────────
           ingress:
             enabled: true
