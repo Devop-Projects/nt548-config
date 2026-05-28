@@ -1,0 +1,93 @@
+{{/*
+Example only - not rendered by Helm because this file is outside templates/.
+
+Purpose:
+- Draft Prometheus-based AnalysisTemplate for Phase 7.
+- Keep the active rollout on templates/analysistemplate-success-rate.yaml
+  until Prometheus traffic metrics are validated.
+
+How to promote later:
+1. Move/copy this file into charts/task-manager/templates/.
+2. Change values to reference success-rate-prometheus instead of success-rate-web.
+3. Ensure preview/canary traffic exists before relying on rate/latency queries.
+*/}}
+apiVersion: argoproj.io/v1alpha1
+kind: AnalysisTemplate
+metadata:
+  name: success-rate-prometheus
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "task-manager.backend.labels" . | nindent 4 }}
+spec:
+  args:
+    - name: service-name
+      # BlueGreen prePromotion should pass: backend-preview
+      # Canary/background analysis should pass: backend-canary
+    - name: namespace
+      value: {{ .Values.namespace.name }}
+
+  metrics:
+    # Basic scrape health. This is safe to test even when preview has no user traffic.
+    - name: prometheus-target-up
+      interval: 30s
+      count: 5
+      initialDelay: 30s
+      successCondition: result[0] >= 1
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            max(
+              up{
+                namespace="{{`{{args.namespace}}`}}",
+                service="{{`{{args.service-name}}`}}"
+              }
+            )
+
+    # HTTP success ratio from real traffic.
+    # Note: backend metrics use status_code, not status.
+    - name: http-success-rate
+      interval: 30s
+      count: 5
+      initialDelay: 60s
+      successCondition: result[0] >= 0.99
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            (
+              sum(rate(http_requests_total{
+                namespace="{{`{{args.namespace}}`}}",
+                service="{{`{{args.service-name}}`}}",
+                status_code!~"5.."
+              }[2m]))
+              /
+              clamp_min(
+                sum(rate(http_requests_total{
+                  namespace="{{`{{args.namespace}}`}}",
+                  service="{{`{{args.service-name}}`}}"
+                }[2m])),
+                0.001
+              )
+            )
+
+    # p99 latency from real traffic. Threshold: p99 < 500ms.
+    - name: p99-latency
+      interval: 30s
+      count: 5
+      initialDelay: 60s
+      successCondition: result[0] < 0.5
+      failureLimit: 2
+      provider:
+        prometheus:
+          address: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+          query: |
+            histogram_quantile(
+              0.99,
+              sum(rate(http_request_duration_seconds_bucket{
+                namespace="{{`{{args.namespace}}`}}",
+                service="{{`{{args.service-name}}`}}"
+              }[2m])) by (le)
+            )
