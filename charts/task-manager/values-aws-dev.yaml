@@ -48,7 +48,7 @@ backend:
       prePromotionAnalysis:
         enabled: true
         templates:
-          - success-rate-web
+          - success-rate-prometheus
       postPromotionAnalysis:
         enabled: false
         templates: []
