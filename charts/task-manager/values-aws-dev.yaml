@@ -18,7 +18,7 @@ backend:
   replicaCount: 1
   image:
     repository: doanvantai/nt548-backend
-    tag: "fa406e6" # CI sẽ update
+    tag: "ea3c5b2" # CI sẽ update
   config:
     LOG_LEVEL: info
     # ⚠️ Update theo RDS endpoint thực tế:
@@ -56,7 +56,7 @@ frontend:
   replicaCount: 1
   image:
     repository: doanvantai/nt548-frontend
-    tag: "fa406e6"
+    tag: "ea3c5b2"
 # Tắt postgres in-cluster (dùng RDS thay)
 postgres:
   enabled: false
