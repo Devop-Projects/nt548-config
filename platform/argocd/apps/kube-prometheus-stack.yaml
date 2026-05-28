@@ -98,13 +98,13 @@ spec:
               alb.ingress.kubernetes.io/healthcheck-path: /api/health
               alb.ingress.kubernetes.io/group.name: monitoring
             hosts:
-              - grafana.cookial.site
+              - grafana.vantai.click
             paths:
               - /
           # ─── Grafana config ─────────────────────────────
           grafana.ini:
             server:
-              root_url: "https://grafana.cookial.site"
+              root_url: "https://grafana.vantai.click"
               serve_from_sub_path: false
             auth.anonymous:
               enabled: false
