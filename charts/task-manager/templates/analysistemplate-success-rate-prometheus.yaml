@@ -27,7 +27,7 @@ spec:
       value: {{ .Values.namespace.name }}
 
   metrics:
-    # 1. Kiểm tra Scrape Health của Pods Backend nói chung trong namespace
+    # 1. Kiểm tra trạng thái Target Up
     - name: prometheus-target-up
       interval: 30s
       count: 5
@@ -45,7 +45,7 @@ spec:
               }
             )
 
-    # 2. HTTP success ratio đo đạc trên Pods Backend
+    # 2. Tỷ lệ HTTP Requests thành công (Success Rate)
     - name: http-success-rate
       interval: 30s
       count: 5
@@ -72,7 +72,7 @@ spec:
               )
             )
 
-    # 3. p99 latency đo đạc trên Pods Backend
+    # 3. Độ trễ P99 (p99 latency < 0.5s)
     - name: p99-latency
       interval: 30s
       count: 5
