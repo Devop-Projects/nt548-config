@@ -27,7 +27,7 @@ backend:
     DB_NAME: "appdb"
     DB_USER: "appuser"
     DB_SSL: "true"
-    DEMO_VERSION: v2-bluegreen-demo
+    DEMO_VERSION: v3-bluegreen-demo
   externalSecret:
     enabled: true
     refreshInterval: 1h
