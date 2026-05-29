@@ -43,10 +43,10 @@ spec:
                 namespace="{{`{{args.namespace}}`}}",
                 service="{{`{{args.service-name}}`}}"
               }
-            )
+            ) or vector(0)
 
     # HTTP success ratio from real traffic.
-    # Note: backend metrics use status_code, not status.
+    # Sửa đổi: Thêm "or vector(1)" để khi không có traffic, mặc định tỉ lệ thành công là 100% (1)
     - name: http-success-rate
       interval: 30s
       count: 5
@@ -71,9 +71,10 @@ spec:
                 }[2m])),
                 0.001
               )
-            )
+            ) or vector(1)
 
     # p99 latency from real traffic. Threshold: p99 < 500ms.
+    # Sửa đổi: Thêm "or vector(0)" để khi không có traffic, mặc định độ trễ bằng 0 giây
     - name: p99-latency
       interval: 30s
       count: 5
@@ -90,4 +91,4 @@ spec:
                 namespace="{{`{{args.namespace}}`}}",
                 service="{{`{{args.service-name}}`}}"
               }[2m])) by (le)
-            )
+            ) or vector(0)
