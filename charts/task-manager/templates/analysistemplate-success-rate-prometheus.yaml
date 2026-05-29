@@ -27,7 +27,7 @@ spec:
       value: {{ .Values.namespace.name }}
 
   metrics:
-    # Basic scrape health. This is safe to test even when preview has no user traffic.
+    # 1. Kiểm tra Scrape Health của Pods Backend nói chung trong namespace
     - name: prometheus-target-up
       interval: 30s
       count: 5
@@ -41,12 +41,11 @@ spec:
             max(
               up{
                 namespace="{{`{{args.namespace}}`}}",
-                service="{{`{{args.service-name}}`}}"
+                pod=~"task-manager-backend-.*"
               }
-            ) or vector(0)
+            )
 
-    # HTTP success ratio from real traffic.
-    # Sửa đổi: Thêm "or vector(1)" để khi không có traffic, mặc định tỉ lệ thành công là 100% (1)
+    # 2. HTTP success ratio đo đạc trên Pods Backend
     - name: http-success-rate
       interval: 30s
       count: 5
@@ -60,21 +59,20 @@ spec:
             (
               sum(rate(http_requests_total{
                 namespace="{{`{{args.namespace}}`}}",
-                service="{{`{{args.service-name}}`}}",
+                pod=~"task-manager-backend-.*",
                 status_code!~"5.."
               }[2m]))
               /
               clamp_min(
                 sum(rate(http_requests_total{
                   namespace="{{`{{args.namespace}}`}}",
-                  service="{{`{{args.service-name}}`}}"
+                  pod=~"task-manager-backend-.*"
                 }[2m])),
                 0.001
               )
-            ) or vector(1)
+            )
 
-    # p99 latency from real traffic. Threshold: p99 < 500ms.
-    # Sửa đổi: Thêm "or vector(0)" để khi không có traffic, mặc định độ trễ bằng 0 giây
+    # 3. p99 latency đo đạc trên Pods Backend
     - name: p99-latency
       interval: 30s
       count: 5
@@ -89,6 +87,6 @@ spec:
               0.99,
               sum(rate(http_request_duration_seconds_bucket{
                 namespace="{{`{{args.namespace}}`}}",
-                service="{{`{{args.service-name}}`}}"
+                pod=~"task-manager-backend-.*"
               }[2m])) by (le)
-            ) or vector(0)
+            )
