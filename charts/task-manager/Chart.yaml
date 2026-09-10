@@ -36,8 +36,7 @@ sources:
 
 maintainers:
   - name: Doan Van Tai
-    email: doanvantai@example.com
-    url: https://github.com/doanvantai
+    url: https://github.com/vantai13
 
 # Không có dependencies — không dùng postgresql sub-chart vì có RDS
 # Nếu sau này cần in-cluster postgres cho test:
