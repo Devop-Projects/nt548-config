@@ -26,6 +26,11 @@ this repo rather than a rebuild in the other one.
 
 ## How a change reaches the cluster
 
+![Delivery pipeline](https://raw.githubusercontent.com/Devop-Projects/NT548-DevOps/main/docs/architecture/diagrams/System/system-architecture.png)
+
+*(Diagram hosted in the application repository so both repos describe the same picture
+from one source.)*
+
 ```
 Developer pushes to NT548-DevOps
         │
